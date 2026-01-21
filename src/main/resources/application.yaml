@@ -1,0 +1,70 @@
+spring:
+  application:
+    name: fridge_guardian
+
+  # 数据源配置
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/fridge_guardian?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai
+    username: root
+    password: 123456
+
+  # Thymeleaf 配置
+  thymeleaf:
+    prefix: classpath:/templates/
+    suffix: .html
+    mode: HTML
+    encoding: UTF-8
+    cache: false
+
+  # 文件上传配置
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
+
+# 服务器配置
+server:
+  port: 8080
+  servlet:
+    context-path: /
+
+# MyBatis-Plus 配置
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+  global-config:
+    db-config:
+      id-type: auto
+      logic-delete-field: deleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+  mapper-locations: classpath:mapper/**/*.xml
+
+# Knife4j API 文档配置
+knife4j:
+  enable: true
+  openapi:
+    title: 智能冰箱食品管理系统 API
+    description: 提供食品管理、库存预警、AI 推荐等功能
+    version: 1.0.0
+    concat: yourname@example.com
+    group:
+      default:
+        group-name: default
+        api-rule: package
+        api-rule-resources:
+          - com.doom.fg.controller
+
+# 日志配置
+logging:
+  level:
+    com.doom.fg: debug
+    org.springframework.web: info
+
+# AI 配置
+ai:
+  api-key: sk-1f7adfd6ef99498599bf9edd01d0118c
+  api-url: https://api.deepseek.com/chat/completions
+  model: deepseek-chat

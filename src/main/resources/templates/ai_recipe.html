@@ -1,0 +1,209 @@
+<!doctype html>
+<html xmlns:th="http://www.thymeleaf.org">
+  <head>
+    <meta charset="UTF-8" />
+    <title>AI 配餐助手 - 冰箱守卫者</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;700&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css"
+      rel="stylesheet"
+    />
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+      body {
+        background: #f8f9fa;
+        font-family: "Noto Sans SC", sans-serif;
+      }
+      .hero-mini {
+        background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+        padding: 40px 0;
+        color: #fff;
+        margin-bottom: 30px;
+      }
+
+      /* 列表项美化 */
+      .food-check-card {
+        background: #fff;
+        border-radius: 15px;
+        padding: 12px 15px;
+        margin-bottom: 10px;
+        border: 1px solid #eee;
+        transition: all 0.2s;
+        cursor: pointer;
+      }
+      .food-check-card:hover {
+        border-color: #43e97b;
+        background: #f0fff4;
+      }
+      .form-check-input:checked + .form-check-label .food-check-card {
+        border-color: #43e97b;
+        background: #f0fff4;
+      }
+
+      /* AI 菜谱面板 */
+      .recipe-panel {
+        background: #fff;
+        border-radius: 25px;
+        min-height: 500px;
+        padding: 40px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+        position: sticky;
+        top: 20px;
+      }
+      .recipe-content {
+        line-height: 1.8;
+        color: #2d3436;
+      }
+      .recipe-content h2 {
+        color: #2ecc71;
+        border-bottom: 2px solid #f0fff4;
+        padding-bottom: 10px;
+      }
+      .recipe-content ul {
+        padding-left: 20px;
+      }
+
+      .loading-animation {
+        animation: pulse 1.5s infinite;
+        color: #2ecc71;
+      }
+      @keyframes pulse {
+        0% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.5;
+        }
+        100% {
+          opacity: 1;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="hero-mini text-center position-relative">
+      <a
+        href="/"
+        class="btn btn-light position-absolute start-0 top-50 translate-middle-y ms-4"
+      >
+        <i class="bi bi-house-door"></i> 返回首页
+      </a>
+      <h2 class="fw-bold"><i class="bi bi-stars"></i> AI 灵感配餐</h2>
+      <p class="mb-0">别发愁吃什么，让 AI 帮你清空冰箱</p>
+    </div>
+
+    <div class="container mb-5">
+      <div class="row">
+        <!-- 左侧：食材选择 -->
+        <div class="col-lg-4">
+          <div class="mb-4 d-flex justify-content-between align-items-center">
+            <h5 class="fw-bold mb-0">选择现有食材</h5>
+            <button
+              class="btn btn-sm btn-outline-success"
+              onclick="location.reload()"
+            >
+              刷新库存
+            </button>
+          </div>
+          <div
+            id="foodSelectionList"
+            style="max-height: 600px; overflow-y: auto; padding-right: 10px"
+          >
+            <!-- 动态加载 -->
+          </div>
+          <div class="d-grid mt-4">
+            <button
+              class="btn btn-success fw-bold py-3"
+              style="border-radius: 15px"
+              onclick="generateRecipe()"
+            >
+              <i class="bi bi-magic"></i> 开始配餐
+            </button>
+          </div>
+        </div>
+
+        <!-- 右侧：生成结果 -->
+        <div class="col-lg-8">
+          <div class="recipe-panel" id="recipeBox">
+            <div class="text-center py-5" id="idleState">
+              <i class="bi bi-egg-fried display-1 text-light mb-4"></i>
+              <h4 class="text-muted">等待主厨下令...</h4>
+              <p class="text-muted small">在左侧勾选您想要处理的食材</p>
+            </div>
+
+            <div id="loadingState" class="text-center py-5 d-none">
+              <div class="spinner-grow text-success mb-3"></div>
+              <h4 class="loading-animation">AI 正在研究菜谱...</h4>
+              <p class="text-muted">正在根据食材营养与口感进行搭配</p>
+            </div>
+
+            <div id="recipeResult" class="recipe-content d-none">
+              <!-- Markdown 渲染结果 -->
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // 加载食材
+      fetch("/api/food/list")
+        .then((res) => res.json())
+        .then((res) => {
+          const list = document.getElementById("foodSelectionList");
+          res.data.forEach((food) => {
+            const item = document.createElement("div");
+            item.className = "food-check-card d-flex align-items-center";
+            item.innerHTML = `
+                    <input class="form-check-input me-3" type="checkbox" value="${food.id}" id="f${food.id}">
+                    <label class="w-100 mb-0" style="cursor:pointer" for="f${food.id}">
+                        <div class="d-flex justify-content-between">
+                            <span class="fw-bold">${food.name}</span>
+                            <small class="text-muted">${food.daysLeft >= 0 ? food.daysLeft + "天过期" : "已过期" + Math.abs(food.daysLeft) + "天"}</small>
+                        </div>
+                    </label>
+                `;
+            item.onclick = (e) => {
+              if (e.target.tagName !== "INPUT") {
+                const ck = item.querySelector("input");
+                ck.checked = !ck.checked;
+              }
+            };
+            list.appendChild(item);
+          });
+        });
+
+      function generateRecipe() {
+        const ids = Array.from(document.querySelectorAll("input:checked")).map(
+          (i) => i.value,
+        );
+        if (ids.length === 0) return alert("请至少选择一个食材！");
+
+        document.getElementById("idleState").classList.add("d-none");
+        document.getElementById("recipeResult").classList.add("d-none");
+        document.getElementById("loadingState").classList.remove("d-none");
+
+        fetch("/api/ai/generate-recipe", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(ids),
+        })
+          .then((res) => res.json())
+          .then((res) => {
+            document.getElementById("loadingState").classList.add("d-none");
+            const result = document.getElementById("recipeResult");
+            result.classList.remove("d-none");
+            // 渲染 Markdown
+            result.innerHTML = marked.parse(res.data.content);
+          });
+      }
+    </script>
+  </body>
+</html>
