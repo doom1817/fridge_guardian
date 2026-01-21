@@ -42,27 +42,27 @@ public class UserRealm extends AuthorizingRealm {
     // 认证：校验 Token
     @Override
     protected AuthenticationInfo doGetAuthenticationInfo(AuthenticationToken auth) throws AuthenticationException {
+        // 1. 获取 Token 字符串
         String token = (String) auth.getCredentials();
 
-        // 1. 校验 Token 签名和过期时间
+        // 2. 校验 Token 签名 (验证是否被篡改、是否过期)
         DecodedJWT jwt = jwtUtil.verify(token);
         if (jwt == null) {
             throw new AuthenticationException("Token 无效或已过期");
         }
 
+        // 3. 从 Token 中提取 userId
         Long userId = jwt.getClaim("userId").asLong();
 
-        // 2. (可选) 查询数据库确保用户真实存在
-        // 如果为了赶进度，且相信 Token 只要签名对就是合法的，这一步可以跳过。
-        // User user = userService.getById(userId);
-        // if (user == null) throw new UnknownAccountException("用户不存在");
+        // 4. [关键] 查询数据库，确保用户真实存在 (防止 Token 虽然未过期，但用户已被管理员删除的情况)
+        User user = userService.getById(userId);
+        if (user == null) {
+            throw new UnknownAccountException("用户不存在");
+        }
 
-        // 3. 构建用户信息返回给 Shiro
-        // 这里为了简单，我们构造一个只有 ID 的 User 对象，或者你直接存 userId 也可以
-        User principalUser = new User();
-        principalUser.setId(userId);
-        principalUser.setUsername(jwt.getClaim("username").asString());
-
-        return new SimpleAuthenticationInfo(principalUser, token, getName());
+        // 5. 认证成功！
+        // 第一个参数 (Principal) 传入查出来的 user 对象，
+        // 这样在 Controller 里就能通过 SecurityUtils.getSubject().getPrincipal() 拿到它
+        return new SimpleAuthenticationInfo(user, token, getName());
     }
 }

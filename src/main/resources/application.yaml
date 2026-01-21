@@ -31,7 +31,7 @@ spring:
 # 定义一个 JWT 密钥
 jwt:
   secret: FridgeGuardianSecretKey2026 # 随便写长一点
-  expire: 86400000*7 # 7天
+  expire: 604800000 # 7天
 
 # 服务器配置
 server:
