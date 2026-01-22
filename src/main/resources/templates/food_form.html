@@ -1,5 +1,5 @@
 <!doctype html>
-<html xmlns:th="http://www.thymeleaf.org">
+<html>
   <head>
     <meta charset="UTF-8" />
     <title>添加食材 - 冰箱守卫者</title>
@@ -155,19 +155,28 @@
       if (!token) window.location.href = "/login";
       // 设置保质期默认为今天
       document.addEventListener("DOMContentLoaded", function () {
-        const today = new Date().toISOString().split("T")[0];
-        document.querySelector('input[name="expiryDate"]').value = today;
+        document.querySelector('input[name="expiryDate"]').value = new Date().toISOString().split("T")[0];
       });
 
       // 初始化分类
-      fetch("/api/food/categories")
-        .then((res) => res.json())
+      fetch("/api/food/categories",{
+        headers: { "Content-Type": "application/json","Authorization": token },
+      })
         .then((res) => {
-          const select = document.getElementById("categorySelect");
-          res.data.forEach((c) => {
-            const opt = new Option(c.name, c.id);
-            select.add(opt);
-          });
+            if (res.token === 401){
+              window.location.href = "/login";
+              return;
+          }
+          return res.json();
+        })
+        .then((res) => {
+          if (res && res.data) {
+            const select = document.getElementById("categorySelect");
+            res.data.forEach((c) => {
+              const opt = new Option(c.name, c.id);
+              select.add(opt);
+            });
+          }
         });
 
       document.getElementById("addFoodForm").onsubmit = function (e) {

@@ -156,14 +156,23 @@
       const token = localStorage.getItem("fg_token");
       if (!token) window.location.href = "/login";
       // 加载食材
-      fetch("/api/food/list")
-        .then((res) => res.json())
+      fetch("/api/food/list",{
+        headers: { "Authorization": token }
+      })
         .then((res) => {
-          const list = document.getElementById("foodSelectionList");
-          res.data.forEach((food) => {
-            const item = document.createElement("div");
-            item.className = "food-check-card d-flex align-items-center";
-            item.innerHTML = `
+          if(res.status === 401){
+            window.location.href = "/login";
+            return;
+          }
+          return  res.json()
+        })
+        .then((res) => {
+          if(res && res.data) {
+            const list = document.getElementById("foodSelectionList");
+            res.data.forEach((food) => {
+              const item = document.createElement("div");
+              item.className = "food-check-card d-flex align-items-center";
+              item.innerHTML = `
                     <input class="form-check-input me-3" type="checkbox" value="${food.id}" id="f${food.id}">
                     <label class="w-100 mb-0" style="cursor:pointer" for="f${food.id}">
                         <div class="d-flex justify-content-between">
@@ -172,15 +181,17 @@
                         </div>
                     </label>
                 `;
-            item.onclick = (e) => {
-              if (e.target.tagName !== "INPUT") {
-                const ck = item.querySelector("input");
-                ck.checked = !ck.checked;
-              }
-            };
-            list.appendChild(item);
-          });
+              item.onclick = (e) => {
+                if (e.target.tagName !== "INPUT") {
+                  const ck = item.querySelector("input");
+                  ck.checked = !ck.checked;
+                }
+              };
+              list.appendChild(item);
+            });
+          }
         });
+
 
       function generateRecipe() {
         const ids = Array.from(document.querySelectorAll("input:checked")).map(
