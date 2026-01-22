@@ -63,11 +63,17 @@
 
 ---
 
-## 🚀 快速开始
+## 如图介绍
 
-### 1. 环境准备
-确保您的开发环境已安装：
-- JDK 17 或更高版本
-- Maven 3.6+
-- MySQL 8.0+
-- Redis Server
+### 1. 登录/注册页面
+![img.png](项目介绍/login.png)
+![img.png](项目介绍/register.png)
+### 2. 主页
+![img.png](项目介绍/index.png)
+### 3. 食材管理
+![img.png](项目介绍/foodList.png)
+![img.png](项目介绍/addFood.png)
+### 4. 食材过期监控 (10s一换 ，应该每次登录是提示的)
+![img.png](项目介绍/expire.png)
+### 5.ai助手配餐
+![img.png](项目介绍/aiFood.png)
