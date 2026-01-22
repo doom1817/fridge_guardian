@@ -2,6 +2,9 @@ package com.doom.fg.entity;
 
 import com.baomidou.mybatisplus.annotation.*;
 import lombok.Data;
+
+import java.io.Serial;
+import java.io.Serializable;
 import java.time.LocalDateTime;
 /**
  * Created with IntelliJ IDEA.
@@ -12,7 +15,10 @@ import java.time.LocalDateTime;
  */
 @Data
 @TableName("user")
-public class User {
+public class User implements Serializable {
+    @Serial
+    private static final long serialVersionUID = 1L;
+
     @TableId(type = IdType.AUTO)
     private Long id;
 
