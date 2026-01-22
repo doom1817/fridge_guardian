@@ -2,87 +2,375 @@
 <html>
 <head>
   <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>食材库存 - 冰箱守卫者</title>
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&display=swap" rel="stylesheet" />
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet" />
+
   <style>
-    :root { --glass-bg: rgba(255, 255, 255, 0.8); --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
-    body { background: #f0f2f5; font-family: "Noto Sans SC", sans-serif; }
-    .navbar-custom { background: var(--primary-gradient); padding: 15px 0; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); }
-    .glass-panel { background: var(--glass-bg); border-radius: 25px; padding: 30px; margin-top: 30px; }
-    .table thead th { border-bottom: 2px solid #eee; }
-    .status-badge { padding: 5px 12px; border-radius: 10px; font-weight: 600; font-size: 0.8rem; }
+    :root {
+      --primary-color: #6c5ce7;
+      --success-color: #00b894;
+      --danger-color: #ff7675;
+      --glass-bg: rgba(255, 255, 255, 0.65);
+      --glass-border: rgba(255, 255, 255, 0.5);
+      --shadow-light: 0 8px 32px 0 rgba(31, 38, 135, 0.15);
+    }
+
+    body {
+      background-color: #dfe6e9;
+      font-family: "Noto Sans SC", sans-serif;
+      color: #2d3436;
+      min-height: 100vh;
+      overflow-x: hidden;
+      position: relative;
+    }
+
+    /* === 1. 动态背景光斑 (保持统一风格) === */
+    .background-blobs {
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%; z-index: -1;
+      overflow: hidden;
+    }
+    .blob {
+      position: absolute; border-radius: 50%; filter: blur(60px); opacity: 0.6;
+      animation: float 10s infinite ease-in-out;
+    }
+    .blob-1 { top: -10%; left: -10%; width: 500px; height: 500px; background: #a29bfe; animation-delay: 0s; }
+    .blob-2 { bottom: -10%; right: -10%; width: 400px; height: 400px; background: #74b9ff; animation-delay: 2s; }
+    .blob-3 { top: 30%; right: 20%; width: 300px; height: 300px; background: #81ecec; animation-delay: 4s; }
+
+    @keyframes float {
+      0%, 100% { transform: translate(0, 0) scale(1); }
+      50% { transform: translate(30px, -30px) scale(1.1); }
+    }
+
+    /* === 2. 顶部导航栏 === */
+    .navbar-glass {
+      background: rgba(255, 255, 255, 0.8);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--glass-border);
+      padding: 15px 0;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .nav-btn {
+      border-radius: 50px;
+      padding: 8px 20px;
+      font-weight: 600;
+      transition: all 0.3s;
+      border: none;
+    }
+    .nav-btn-primary {
+      background: linear-gradient(135deg, #6c5ce7, #a29bfe);
+      color: white;
+      box-shadow: 0 4px 15px rgba(108, 92, 231, 0.3);
+    }
+    .nav-btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 20px rgba(108, 92, 231, 0.4);
+      color: white;
+    }
+
+    /* === 3. 主容器与搜索框 === */
+    .main-container {
+      max-width: 1000px;
+      margin: 40px auto;
+      padding: 0 20px;
+    }
+
+    .glass-panel {
+      background: var(--glass-bg);
+      backdrop-filter: blur(16px);
+      border: 1px solid var(--glass-border);
+      border-radius: 24px;
+      box-shadow: var(--shadow-light);
+      padding: 30px;
+      animation: fadeInUp 0.8s forwards;
+    }
+
+    .search-wrapper {
+      position: relative;
+      margin-bottom: 30px;
+    }
+    .search-input {
+      width: 100%;
+      background: rgba(255, 255, 255, 0.5);
+      border: 2px solid transparent;
+      border-radius: 20px;
+      padding: 15px 20px 15px 50px;
+      font-size: 1rem;
+      transition: all 0.3s;
+      box-shadow: inset 0 2px 4px rgba(0,0,0,0.05);
+    }
+    .search-input:focus {
+      background: #fff;
+      border-color: var(--primary-color);
+      box-shadow: 0 0 0 4px rgba(108, 92, 231, 0.1);
+      outline: none;
+    }
+    .search-icon {
+      position: absolute;
+      left: 20px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #b2bec3;
+      font-size: 1.2rem;
+    }
+
+    /* === 4. 列表样式 === */
+    .food-table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0 10px; /* 行间距 */
+    }
+    .food-table thead th {
+      border: none;
+      color: #636e72;
+      font-weight: 600;
+      padding: 10px 20px;
+      text-transform: uppercase;
+      font-size: 0.85rem;
+      letter-spacing: 1px;
+    }
+    .food-row {
+      background: rgba(255, 255, 255, 0.4);
+      transition: all 0.3s;
+    }
+    .food-row td {
+      border: none;
+      padding: 20px;
+      vertical-align: middle;
+    }
+    .food-row td:first-child { border-top-left-radius: 16px; border-bottom-left-radius: 16px; }
+    .food-row td:last-child { border-top-right-radius: 16px; border-bottom-right-radius: 16px; }
+
+    .food-row:hover {
+      background: rgba(255, 255, 255, 0.9);
+      transform: scale(1.01);
+      box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+    }
+
+    /* 状态徽章 */
+    .status-badge {
+      padding: 6px 12px;
+      border-radius: 12px;
+      font-weight: 600;
+      font-size: 0.85rem;
+      display: inline-flex;
+      align-items: center;
+    }
+    .badge-fresh { background: rgba(0, 184, 148, 0.15); color: #00b894; }
+    .badge-warning { background: rgba(253, 203, 110, 0.2); color: #e17055; }
+    .badge-danger { background: rgba(255, 118, 117, 0.15); color: #d63031; }
+
+    /* 操作按钮 */
+    .action-btn {
+      width: 36px; height: 36px;
+      border-radius: 10px;
+      display: inline-flex;
+      align-items: center; justify-content: center;
+      border: none;
+      transition: all 0.2s;
+      margin-left: 8px;
+    }
+    .btn-eat { background: rgba(0, 184, 148, 0.1); color: #00b894; }
+    .btn-eat:hover { background: #00b894; color: white; transform: rotate(-10deg); }
+
+    .btn-waste { background: rgba(255, 118, 117, 0.1); color: #ff7675; }
+    .btn-waste:hover { background: #ff7675; color: white; transform: rotate(10deg); }
+
+    /* 动画 */
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
   </style>
 </head>
 <body>
-<nav class="navbar-custom">
-  <div class="container d-flex justify-content-between">
-    <a class="navbar-brand text-white fw-bold" href="/"><i class="bi bi-snow2"></i> 冰箱守卫者</a>
-    <a href="/food/add-page" class="btn btn-light btn-sm fw-bold px-3" style="border-radius: 10px">+ 录入食材</a>
+
+<div class="background-blobs">
+  <div class="blob blob-1"></div>
+  <div class="blob blob-2"></div>
+  <div class="blob blob-3"></div>
+</div>
+
+<nav class="navbar-glass">
+  <div class="container d-flex justify-content-between align-items-center">
+    <a class="navbar-brand fw-bold d-flex align-items-center" href="/" style="color: #2d3436; font-size: 1.4rem;">
+      <i class="bi bi-snow2 me-2 text-primary"></i> 冰箱守卫者
+    </a>
+    <div>
+      <a href="/" class="btn btn-link text-decoration-none text-secondary me-2">返回首页</a>
+      <a href="/food/add-page" class="nav-btn nav-btn-primary text-decoration-none">
+        <i class="bi bi-plus-lg me-1"></i> 录入食材
+      </a>
+    </div>
   </div>
 </nav>
 
-<div class="container mb-5">
-  <div class="row justify-content-center">
-    <div class="col-lg-11">
-      <div class="glass-panel">
-        <div class="d-flex justify-content-between align-items-center mb-4">
-          <h4 class="fw-bold mb-0">我的食材库存</h4>
-          <input type="text" id="searchInput" class="form-control w-25" placeholder="🔍 搜索食材..." onkeyup="filterTable()">
-        </div>
+<div class="main-container">
+  <div class="glass-panel">
+    <div class="d-flex flex-wrap justify-content-between align-items-end mb-4">
+      <div>
+        <h2 class="fw-bold mb-1">我的食材库存</h2>
+        <p class="text-muted mb-0">管理您的冰箱，避免浪费每一份新鲜</p>
+      </div>
+      <div class="text-end">
+          <span class="badge bg-light text-dark border p-2 rounded-3">
+            共 <span id="totalCount" class="fw-bold text-primary">0</span> 件物品
+          </span>
+      </div>
+    </div>
 
-        <div class="table-responsive">
-          <table class="table" id="foodTable">
-            <thead>
-            <tr><th>食材信息</th><th>位置</th><th>保质期至</th><th>状态</th><th class="text-end">操作</th></tr>
-            </thead>
-            <tbody id="tableBody">
-            </tbody>
-          </table>
+    <div class="search-wrapper">
+      <i class="bi bi-search search-icon"></i>
+      <input type="text" id="searchInput" class="search-input" placeholder="搜索食材名称、位置..." onkeyup="filterTable()">
+    </div>
+
+    <div class="table-responsive">
+      <table class="food-table">
+        <thead>
+        <tr>
+          <th>食材信息</th>
+          <th>存储位置</th>
+          <th>保质期状态</th>
+          <th class="text-end">快捷操作</th>
+        </tr>
+        </thead>
+        <tbody id="tableBody">
+        </tbody>
+      </table>
+
+      <div id="emptyState" class="text-center py-5 d-none">
+        <div class="mb-3">
+          <i class="bi bi-box-seam display-1 text-muted opacity-25"></i>
         </div>
+        <h5 class="text-muted">冰箱空空如也</h5>
+        <p class="text-muted small">快去录入一些新鲜食材吧</p>
+        <a href="/food/add-page" class="btn btn-outline-primary btn-sm rounded-pill mt-2">去录入</a>
       </div>
     </div>
   </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
+  // 1. Token 校验
   const token = localStorage.getItem("fg_token");
   if(!token) window.location.href = "/login";
 
+  // 2. 加载数据
   async function loadData() {
-    const res = await fetch("/api/food/list", { headers: { "Authorization": token } });
-    const result = await res.json();
-    if(result.code === 200) {
-      renderTable(result.data);
-    } else if(res.status === 401) {
-      window.location.href = "/login";
+    try {
+      const res = await fetch("/api/food/list", {
+        headers: { "Authorization": token }
+      });
+      if(res.status === 401) {
+        window.location.href = "/login";
+        return;
+      }
+      const result = await res.json();
+
+      if(result.code === 200) {
+        renderTable(result.data);
+        document.getElementById("totalCount").textContent = result.data.length;
+      }
+    } catch(e) {
+      console.error("加载失败", e);
     }
   }
 
+  // 3. 渲染列表 (适配新 UI)
   function renderTable(list) {
     const tbody = document.getElementById("tableBody");
+    const emptyState = document.getElementById("emptyState");
+
     tbody.innerHTML = "";
+
+    if (!list || list.length === 0) {
+      emptyState.classList.remove("d-none");
+      return;
+    } else {
+      emptyState.classList.add("d-none");
+    }
+
+    // 动画延迟索引
+    let delayIndex = 0;
+
     list.forEach(food => {
       const tr = document.createElement("tr");
-      const daysText = food.daysLeft <= 3 ? `<small class="text-danger fw-bold">${food.daysLeft}天后过期</small>` : `<small class="text-success">${food.daysLeft}天后过期</small>`;
+      tr.className = "food-row";
+      tr.style.animation = `fadeInUp 0.5s ease forwards ${delayIndex * 0.05}s`;
+      tr.style.opacity = "0"; // 初始隐藏，等动画执行
+
+      // 计算状态样式
+      let dayClass = 'badge-fresh';
+      let icon = '<i class="bi bi-shield-check me-1"></i>';
+      let dayText = `${food.daysLeft} 天后过期`;
+
+      if (food.daysLeft < 0) {
+        dayClass = 'badge-danger';
+        icon = '<i class="bi bi-exclamation-triangle-fill me-1"></i>';
+        dayText = `已过期 ${Math.abs(food.daysLeft)} 天`;
+      } else if (food.daysLeft <= 3) {
+        dayClass = 'badge-warning';
+        icon = '<i class="bi bi-clock-history me-1"></i>';
+        dayText = `剩 ${food.daysLeft} 天`;
+      }
+
+      // 存储位置图标映射
+      const locIcon = {
+        'FRIDGE': 'bi-snow',
+        'FREEZER': 'bi-box-seam',
+        'PANTRY': 'bi-sun'
+      }[food.storageLocation] || 'bi-geo-alt';
 
       tr.innerHTML = `
-                <td><div class="fw-bold">${food.name}</div><small class="text-muted">${food.quantity || 1} ${food.unit || ''}</small></td>
-                <td><span class="text-muted"><i class="bi bi-geo-alt"></i> ${food.storageLocation || '未知'}</span></td>
-                <td><div>${food.expiryDate}</div>${daysText}</td>
-                <td><span class="status-badge bg-success-subtle text-success">在库</span></td>
-                <td class="text-end">
-                    <button class="btn btn-sm btn-outline-primary me-2" onclick="updateStatus(${food.id}, 1)">已食用</button>
-                    <button class="btn btn-sm btn-outline-danger" onclick="updateStatus(${food.id}, 2)">浪费</button>
-                </td>
-              `;
+              <td>
+                <div class="d-flex align-items-center">
+                    <div class="rounded-3 bg-white d-flex align-items-center justify-content-center shadow-sm me-3" style="width:48px;height:48px; font-size:1.5rem;">
+                        <span role="img">🥗</span>
+                    </div>
+                    <div>
+                        <div class="fw-bold text-dark" style="font-size:1.05rem;">${food.name}</div>
+                        <small class="text-muted">${food.quantity || 1} ${food.unit || ''}</small>
+                    </div>
+                </div>
+              </td>
+              <td>
+                <span class="text-secondary fw-medium">
+                    <i class="bi ${locIcon} me-1"></i> ${food.storageLocation || '冷藏'}
+                </span>
+              </td>
+              <td>
+                <div class="d-flex flex-column">
+                    <span class="status-badge ${dayClass}">
+                        ${icon} ${dayText}
+                    </span>
+                    <small class="text-muted mt-1 ms-1" style="font-size:0.75rem">${food.expiryDate}</small>
+                </div>
+              </td>
+              <td class="text-end">
+                <button class="action-btn btn-eat" onclick="updateStatus(${food.id}, 1)" title="吃掉了">
+                    <i class="bi bi-check-lg"></i>
+                </button>
+                <button class="action-btn btn-waste" onclick="updateStatus(${food.id}, 2)" title="浪费了">
+                    <i class="bi bi-trash"></i>
+                </button>
+              </td>
+            `;
       tbody.appendChild(tr);
+      delayIndex++;
     });
   }
 
+  // 4. 更新状态
   function updateStatus(id, status) {
-    if (confirm("确认操作吗？")) {
+    if (confirm(status === 1 ? "确认已食用？" : "确认不得不丢弃？")) {
       fetch(`/api/food/${id}/status?status=${status}`, {
         method: "PUT",
         headers: { "Authorization": token }
@@ -94,7 +382,7 @@
     }
   }
 
-  // 简单的前端搜索
+  // 5. 纯前端搜索
   function filterTable() {
     const filter = document.getElementById("searchInput").value.toLowerCase();
     const rows = document.getElementById("tableBody").getElementsByTagName("tr");
@@ -104,6 +392,7 @@
     }
   }
 
+  // 初始化
   loadData();
 </script>
 </body>

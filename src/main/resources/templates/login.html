@@ -1,51 +1,340 @@
 <!DOCTYPE html>
-<html>
+<html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>登录 - 冰箱守卫者</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&display=swap" rel="stylesheet" />
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet" />
+
     <style>
-        body { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); height: 100vh; display: flex; align-items: center; justify-content: center; }
-        .login-card { background: white; padding: 40px; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); width: 100%; max-width: 400px; }
-        .btn-primary { background: #667eea; border: none; }
+        :root {
+            --primary-gradient: linear-gradient(135deg, #6c5ce7 0%, #a29bfe 100%);
+            --glass-bg: rgba(255, 255, 255, 0.85);
+            --glass-border: rgba(255, 255, 255, 0.6);
+            --success-color: #00b894;
+            --error-color: #ff7675;
+        }
+
+        body {
+            background-color: #dfe6e9;
+            font-family: "Noto Sans SC", sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            height: 100vh;
+            margin: 0;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* 动态背景 */
+        .background-blobs { position: absolute; width: 100%; height: 100%; z-index: -1; }
+        .blob { position: absolute; border-radius: 50%; filter: blur(80px); opacity: 0.6; animation: float 15s infinite ease-in-out; }
+        .blob-1 { top: -10%; left: -10%; width: 600px; height: 600px; background: #a29bfe; }
+        .blob-2 { bottom: -10%; right: -10%; width: 500px; height: 500px; background: #74b9ff; animation-delay: 2s; }
+        @keyframes float { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(50px, -50px); } }
+
+        /* === 核心容器 === */
+        .container-box {
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            border-radius: 25px;
+            box-shadow: 0 14px 28px rgba(0,0,0,0.1), 0 10px 10px rgba(0,0,0,0.05);
+            position: relative;
+            overflow: hidden;
+            width: 850px;
+            max-width: 100%;
+            min-height: 650px;
+            border: 1px solid var(--glass-border);
+        }
+
+        .form-container {
+            position: absolute;
+            top: 0;
+            height: 100%;
+            transition: all 0.6s ease-in-out;
+        }
+
+        /* === 布局逻辑 === */
+        .sign-in-container { left: 0; width: 50%; z-index: 2; opacity: 1; }
+        .container-box.right-panel-active .sign-in-container { transform: translateX(100%); opacity: 0; z-index: 1; }
+
+        .sign-up-container { left: 0; width: 50%; opacity: 0; z-index: 1; }
+        .container-box.right-panel-active .sign-up-container { transform: translateX(100%); opacity: 1; z-index: 5; animation: show 0.6s; }
+
+        @keyframes show { 0%, 49.99% { opacity: 0; z-index: 1; } 50%, 100% { opacity: 1; z-index: 5; } }
+
+        /* === 表单元素 === */
+        form { background: transparent; display: flex; align-items: center; justify-content: center; flex-direction: column; padding: 0 50px; height: 100%; text-align: center; }
+        h1 { font-weight: bold; margin-bottom: 20px; color: #2d3436; }
+
+        .input-group-custom { position: relative; width: 100%; margin: 8px 0; }
+        .input-group-custom i { position: absolute; left: 15px; top: 50%; transform: translateY(-50%); color: #b2bec3; transition: 0.3s; }
+
+        input {
+            background-color: #f5f6fa; border: 2px solid transparent; padding: 12px 15px 12px 45px; width: 100%;
+            border-radius: 12px; outline: none; font-size: 0.95rem; transition: 0.3s;
+        }
+        input:focus { background-color: #fff; border-color: #6c5ce7; box-shadow: 0 0 0 4px rgba(108, 92, 231, 0.1); }
+        input:focus + i { color: #6c5ce7; }
+
+        .btn-grad {
+            background: var(--primary-gradient); color: #ffffff; font-size: 12px; font-weight: bold;
+            padding: 12px 45px; letter-spacing: 1px; text-transform: uppercase; border: none; border-radius: 50px;
+            cursor: pointer; transition: all 0.3s; margin-top: 25px; box-shadow: 0 5px 15px rgba(108, 92, 231, 0.3);
+        }
+        .btn-grad:hover { box-shadow: 0 8px 20px rgba(108, 92, 231, 0.4); transform: translateY(-2px); }
+        .btn-grad:active { transform: scale(0.95); }
+
+        /* === 遮罩层 === */
+        .overlay-container {
+            position: absolute; top: 0; left: 50%; width: 50%; height: 100%;
+            overflow: hidden; transition: transform 0.6s ease-in-out; z-index: 100;
+        }
+        .container-box.right-panel-active .overlay-container { transform: translateX(-100%); }
+
+        .overlay {
+            background: var(--primary-gradient); background-repeat: no-repeat; background-size: cover; background-position: 0 0;
+            color: #ffffff; position: relative; left: -100%; height: 100%; width: 200%;
+            transform: translateX(0); transition: transform 0.6s ease-in-out;
+        }
+        .container-box.right-panel-active .overlay { transform: translateX(50%); }
+
+        .overlay-panel {
+            position: absolute; display: flex; align-items: center; justify-content: center;
+            flex-direction: column; padding: 0 40px; text-align: center; top: 0; height: 100%; width: 50%;
+            transform: translateX(0); transition: transform 0.6s ease-in-out;
+        }
+        .overlay-left { transform: translateX(-20%); }
+        .container-box.right-panel-active .overlay-left { transform: translateX(0); }
+        .overlay-right { right: 0; transform: translateX(0); }
+        .container-box.right-panel-active .overlay-right { transform: translateX(20%); }
+
+        .btn-ghost {
+            background-color: transparent; border: 1px solid #fff; color: white; border-radius: 50px;
+            padding: 12px 45px; font-weight: bold; letter-spacing: 1px; text-transform: uppercase; margin-top: 20px; transition: 0.3s;
+        }
+        .btn-ghost:hover { background: rgba(255,255,255,0.2); }
+
+        /* === [新增] 美化提示框 (Toast) === */
+        .toast-container {
+            position: fixed; top: 20px; left: 50%; transform: translateX(-50%); z-index: 9999;
+            display: flex; flex-direction: column; gap: 10px; pointer-events: none;
+        }
+        .custom-toast {
+            background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px);
+            padding: 12px 24px; border-radius: 12px; box-shadow: 0 5px 20px rgba(0,0,0,0.15);
+            display: flex; align-items: center; gap: 12px; min-width: 300px;
+            animation: slideDown 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.28) forwards;
+            border-left: 5px solid #ccc; pointer-events: auto;
+        }
+        .custom-toast.success { border-left-color: var(--success-color); }
+        .custom-toast.success i { color: var(--success-color); }
+        .custom-toast.error { border-left-color: var(--error-color); }
+        .custom-toast.error i { color: var(--error-color); }
+
+        .toast-content { font-size: 0.95rem; font-weight: 500; color: #2d3436; }
+
+        @keyframes slideDown { from { transform: translateY(-100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        @keyframes fadeOut { to { opacity: 0; transform: translateY(-20px); } }
+
+        /* === [新增] 美化确认弹窗 (Modal) === */
+        .custom-modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.4); backdrop-filter: blur(4px); z-index: 10000;
+            display: none; justify-content: center; align-items: center;
+            animation: fadeIn 0.2s ease-out;
+        }
+        .custom-modal {
+            background: white; width: 90%; max-width: 400px; border-radius: 20px; padding: 30px;
+            text-align: center; box-shadow: 0 15px 40px rgba(0,0,0,0.2);
+            animation: popIn 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+        }
+        .modal-icon {
+            width: 60px; height: 60px; background: #e0f7fa; color: #00cec9; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center; font-size: 1.8rem; margin: 0 auto 20px;
+        }
+        .modal-btns { display: flex; justify-content: center; gap: 15px; margin-top: 25px; }
+        .btn-modal { padding: 10px 25px; border-radius: 10px; border: none; font-weight: 600; cursor: pointer; transition: 0.2s; }
+        .btn-modal-cancel { background: #f1f2f6; color: #636e72; }
+        .btn-modal-cancel:hover { background: #dfe4ea; }
+        .btn-modal-confirm { background: #6c5ce7; color: white; }
+        .btn-modal-confirm:hover { background: #a29bfe; }
+
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes popIn { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+        /* 响应式 */
+        @media (max-width: 768px) {
+            .container-box { min-height: 700px; width: 95%; }
+            .form-container { width: 100%; position: relative; height: auto; padding: 40px 0; }
+            .overlay-container { display: none; }
+            .sign-in-container { display: flex; z-index: 5; opacity: 1; }
+            .sign-up-container { display: none; opacity: 0; }
+            .container-box.mobile-toggle .sign-in-container { display: none; }
+            .container-box.mobile-toggle .sign-up-container { display: flex; opacity: 1; animation: none; }
+        }
     </style>
 </head>
 <body>
-<div class="login-card">
-    <h3 class="text-center fw-bold mb-4">🧊 冰箱守卫者</h3>
-    <ul class="nav nav-tabs mb-4" id="myTab" role="tablist">
-        <li class="nav-item w-50" role="presentation">
-            <button class="nav-link active w-100" id="login-tab" data-bs-toggle="tab" data-bs-target="#login-pane" type="button">登录</button>
-        </li>
-        <li class="nav-item w-50" role="presentation">
-            <button class="nav-link w-100" id="register-tab" data-bs-toggle="tab" data-bs-target="#register-pane" type="button">注册</button>
-        </li>
-    </ul>
-    <div class="tab-content">
-        <div class="tab-pane fade show active" id="login-pane">
-            <form onsubmit="doLogin(event)">
-                <div class="mb-3"><input type="text" id="l_username" class="form-control" placeholder="用户名" required></div>
-                <div class="mb-3"><input type="password" id="l_password" class="form-control" placeholder="密码" required></div>
-                <button type="submit" class="btn btn-primary w-100 py-2">进入系统</button>
-            </form>
-        </div>
-        <div class="tab-pane fade" id="register-pane">
-            <form onsubmit="doRegister(event)">
-                <div class="mb-3"><input type="text" id="r_username" class="form-control" placeholder="设置用户名" required></div>
-                <div class="mb-3"><input type="password" id="r_password" class="form-control" placeholder="设置密码" required></div>
-                <div class="mb-3"><input type="email" id="r_email" class="form-control" placeholder="邮箱 (选填)"></div>
-                <button type="submit" class="btn btn-outline-primary w-100 py-2">立即注册</button>
-            </form>
+
+<div class="background-blobs">
+    <div class="blob blob-1"></div>
+    <div class="blob blob-2"></div>
+</div>
+
+<div id="toast-container" class="toast-container"></div>
+
+<div id="custom-modal" class="custom-modal-overlay">
+    <div class="custom-modal">
+        <div class="modal-icon"><i class="bi bi-question-lg"></i></div>
+        <h4 class="fw-bold mb-2">忘记密码了？</h4>
+        <p class="text-muted small">为了账号安全，我们暂不支持直接找回密码。<br>建议您直接重新注册一个新账号。</p>
+        <div class="modal-btns">
+            <button class="btn-modal btn-modal-cancel" onclick="closeModal()">算了</button>
+            <button class="btn-modal btn-modal-confirm" onclick="confirmSwitch()">去注册</button>
         </div>
     </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<div class="container-box" id="container">
+    <div class="form-container sign-up-container">
+        <form onsubmit="doRegister(event)">
+            <h1>创建账户</h1>
+            <span class="small text-muted mb-3">加入我们，开始智能管理</span>
+
+            <div class="input-group-custom">
+                <input type="text" id="r_username" placeholder="用户名" required />
+                <i class="bi bi-person"></i>
+            </div>
+            <div class="input-group-custom">
+                <input type="email" id="r_email" placeholder="邮箱" required />
+                <i class="bi bi-envelope"></i>
+            </div>
+            <div class="input-group-custom">
+                <input type="password" id="r_password" placeholder="设置密码" required />
+                <i class="bi bi-lock"></i>
+            </div>
+            <div class="input-group-custom">
+                <input type="password" id="r_confirm_password" placeholder="确认密码" required />
+                <i class="bi bi-shield-lock"></i>
+            </div>
+
+            <button class="btn-grad">立即注册</button>
+            <button type="button" class="btn btn-link text-muted d-md-none mt-3" onclick="toggleMobile()">已有账号？去登录</button>
+        </form>
+    </div>
+
+    <div class="form-container sign-in-container">
+        <form onsubmit="doLogin(event)">
+            <h1 class="mb-2">欢迎回来</h1>
+            <p class="text-muted small mb-4">Fridge Guardian 冰箱守卫者</p>
+
+            <div class="input-group-custom">
+                <input type="text" id="l_username" placeholder="用户名" required />
+                <i class="bi bi-person"></i>
+            </div>
+            <div class="input-group-custom">
+                <input type="password" id="l_password" placeholder="密码" required />
+                <i class="bi bi-lock"></i>
+            </div>
+
+            <div class="text-end w-100 mb-3">
+                <a href="#" onclick="showForgotModal(event)" class="text-muted small text-decoration-none" title="点击跳转注册">
+                    忘记密码?
+                </a>
+            </div>
+
+            <button class="btn-grad">登录系统</button>
+            <button type="button" class="btn btn-link text-muted d-md-none mt-3" onclick="toggleMobile()">没有账号？去注册</button>
+        </form>
+    </div>
+
+    <div class="overlay-container">
+        <div class="overlay">
+            <div class="overlay-panel overlay-left">
+                <h1 class="text-white">已有账号？</h1>
+                <p>请登录以继续管理您的食材</p>
+                <button class="btn-ghost" id="signIn">去登录</button>
+            </div>
+            <div class="overlay-panel overlay-right">
+                <h1 class="text-white">新朋友？</h1>
+                <p>注册即可体验 AI 智能配餐</p>
+                <button class="btn-ghost" id="signUp">去注册</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
     const API_BASE = "/api/auth";
+    const container = document.getElementById('container');
+    const signUpBtn = document.getElementById('signUp');
+    const signInBtn = document.getElementById('signIn');
 
+    // 切换动画逻辑
+    signUpBtn.addEventListener('click', () => { container.classList.add("right-panel-active"); });
+    signInBtn.addEventListener('click', () => { container.classList.remove("right-panel-active"); });
+
+    function toggleMobile() {
+        if (window.innerWidth <= 768) {
+            container.classList.toggle("mobile-toggle");
+        } else {
+            container.classList.toggle("right-panel-active");
+        }
+    }
+
+    // === [新增] 提示框工具函数 ===
+    function showToast(message, type = 'info') {
+        const container = document.getElementById('toast-container');
+        const toast = document.createElement('div');
+        toast.className = `custom-toast ${type}`;
+
+        let icon = 'bi-info-circle-fill';
+        if (type === 'success') icon = 'bi-check-circle-fill';
+        if (type === 'error') icon = 'bi-exclamation-circle-fill';
+
+        toast.innerHTML = `<i class="bi ${icon} fs-5"></i><span class="toast-content">${message}</span>`;
+
+        container.appendChild(toast);
+
+        // 3秒后移除
+        setTimeout(() => {
+            toast.style.animation = 'fadeOut 0.3s ease-out forwards';
+            toast.addEventListener('animationend', () => toast.remove());
+        }, 3000);
+    }
+
+    // === [新增] Modal 交互逻辑 ===
+    const modal = document.getElementById('custom-modal');
+    function showForgotModal(e) {
+        e.preventDefault();
+        modal.style.display = 'flex';
+    }
+    function closeModal() {
+        modal.style.display = 'none';
+    }
+    function confirmSwitch() {
+        closeModal();
+        // 触发切换动画
+        if (window.innerWidth <= 768) {
+            container.classList.add("mobile-toggle");
+        } else {
+            container.classList.add("right-panel-active");
+        }
+    }
+
+    // === 登录逻辑 ===
     async function doLogin(e) {
         e.preventDefault();
+        const btn = e.target.querySelector('button.btn-grad');
+        const originalText = btn.innerText;
+        btn.innerText = "登录中...";
+        btn.disabled = true;
+
         const username = document.getElementById("l_username").value;
         const password = document.getElementById("l_password").value;
 
@@ -57,34 +346,65 @@
             });
             const result = await res.json();
             if (result.code === 200) {
-                // 核心：保存 Token
                 localStorage.setItem("fg_token", result.data.token);
                 localStorage.setItem("fg_user", result.data.username);
-                window.location.href = "/";
+                showToast("登录成功，欢迎回来！", "success");
+                setTimeout(() => window.location.href = "/", 1000);
             } else {
-                alert(result.message);
+                showToast(result.message || "登录失败", "error");
+                resetBtn();
             }
-        } catch (err) { alert("网络错误"); }
+        } catch (err) {
+            showToast("网络连接失败，请检查服务", "error");
+            resetBtn();
+        }
+
+        function resetBtn() { btn.innerText = originalText; btn.disabled = false; }
     }
 
+    // === 注册逻辑 ===
     async function doRegister(e) {
         e.preventDefault();
+        const btn = e.target.querySelector('button.btn-grad');
+        const originalText = btn.innerText;
+        btn.innerText = "注册中...";
+        btn.disabled = true;
+
         const username = document.getElementById("r_username").value;
         const password = document.getElementById("r_password").value;
+        const confirmPassword = document.getElementById("r_confirm_password").value;
         const email = document.getElementById("r_email").value;
 
-        const res = await fetch(`${API_BASE}/register`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ username, password, email })
-        });
-        const result = await res.json();
-        if (result.code === 200) {
-            alert("注册成功，请切换到登录页登录");
-            document.getElementById("login-tab").click();
-        } else {
-            alert(result.message);
+        if (password !== confirmPassword) {
+            showToast("两次输入的密码不一致，请检查！", "error");
+            btn.innerText = originalText;
+            btn.disabled = false;
+            return;
         }
+
+        try {
+            const res = await fetch(`${API_BASE}/register`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ username, password, email })
+            });
+            const result = await res.json();
+            if (result.code === 200) {
+                showToast("注册成功！请登录体验", "success");
+                // 自动切回登录
+                if (window.innerWidth <= 768) {
+                    container.classList.remove("mobile-toggle");
+                } else {
+                    container.classList.remove("right-panel-active");
+                }
+                e.target.reset();
+            } else {
+                showToast(result.message || "注册失败", "error");
+            }
+        } catch (err) { showToast("网络错误，请稍后再试", "error"); }
+
+        btn.innerText = originalText;
+        btn.disabled = false;
     }
 </script>
 </body>

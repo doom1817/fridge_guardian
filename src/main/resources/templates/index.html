@@ -4,89 +4,291 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>冰箱守卫者 - 智能食材管理</title>
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&display=swap" rel="stylesheet" />
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet" />
   <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+
   <style>
-    /* 保持你原有的 CSS 样式不变 */
-    :root { --glass-bg: rgba(255, 255, 255, 0.7); --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%); --fresh-gradient: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); --danger-gradient: linear-gradient(135deg, #ff0844 0%, #ffb199 100%); --info-gradient: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); }
-    body { background: #f0f2f5; font-family: "Noto Sans SC", sans-serif; color: #2d3436; }
-    .hero-section { background: var(--primary-gradient); padding: 60px 0 120px 0; color: white; border-radius: 0 0 50px 50px; margin-bottom: -60px; }
-    .stat-card { border: none; border-radius: 20px; transition: all 0.3s; overflow: hidden; background: var(--glass-bg); box-shadow: 0 10px 20px rgba(0, 0, 0, 0.05); }
-    .stat-card:hover { transform: translateY(-10px); box-shadow: 0 15px 30px rgba(0, 0, 0, 0.1); }
-    .icon-box { width: 50px; height: 50px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; margin-bottom: 15px; color: white; }
-    .bg-gradient-danger { background: var(--danger-gradient); }
-    .bg-gradient-primary { background: var(--primary-gradient); }
-    .bg-gradient-success { background: var(--fresh-gradient); }
-    .bg-gradient-info { background: var(--info-gradient); }
-    .btn-action { border-radius: 12px; padding: 10px 20px; font-weight: 500; border: none; }
-    .glass-panel { background: var(--glass-bg); border-radius: 25px; padding: 25px; border: 1px solid rgba(255, 255, 255, 0.3); }
-    .table { --bs-table-bg: transparent; }
-    .badge-custom { padding: 6px 12px; border-radius: 8px; font-weight: 600; }
+    :root {
+      --primary-color: #6c5ce7;
+      --secondary-color: #a29bfe;
+      --accent-color: #00cec9;
+      --danger-color: #ff7675;
+      --glass-bg: rgba(255, 255, 255, 0.65);
+      --glass-border: rgba(255, 255, 255, 0.5);
+      --shadow-light: 0 8px 32px 0 rgba(31, 38, 135, 0.15);
+    }
+
+    body {
+      background-color: #dfe6e9;
+      font-family: "Noto Sans SC", sans-serif;
+      color: #2d3436;
+      overflow-x: hidden;
+      min-height: 100vh;
+      position: relative;
+    }
+
+    /* === 1. 动态背景光斑 === */
+    .background-blobs {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: -1;
+      overflow: hidden;
+    }
+    .blob {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(60px);
+      opacity: 0.6;
+      animation: float 10s infinite ease-in-out;
+    }
+    .blob-1 { top: -10%; left: -10%; width: 500px; height: 500px; background: #a29bfe; animation-delay: 0s; }
+    .blob-2 { bottom: -10%; right: -10%; width: 400px; height: 400px; background: #74b9ff; animation-delay: 2s; }
+    .blob-3 { top: 40%; left: 40%; width: 300px; height: 300px; background: #81ecec; animation-delay: 4s; }
+
+    @keyframes float {
+      0% { transform: translate(0, 0) scale(1); }
+      33% { transform: translate(30px, -50px) scale(1.1); }
+      66% { transform: translate(-20px, 20px) scale(0.9); }
+      100% { transform: translate(0, 0) scale(1); }
+    }
+
+    /* === 2. Hero 区域 === */
+    .hero-section {
+      padding: 60px 0 40px 0;
+      text-align: center;
+      position: relative;
+    }
+    .app-title {
+      font-weight: 800;
+      background: linear-gradient(45deg, #6c5ce7, #0984e3);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 10px;
+      letter-spacing: -1px;
+    }
+    .glass-pill {
+      background: rgba(255, 255, 255, 0.3);
+      backdrop-filter: blur(5px);
+      border: 1px solid rgba(255, 255, 255, 0.5);
+      border-radius: 50px;
+      padding: 5px 20px;
+      color: #636e72;
+      font-weight: 500;
+      font-size: 0.9rem;
+      transition: all 0.3s;
+    }
+    .glass-pill:hover {
+      background: rgba(255, 255, 255, 0.8);
+      transform: translateY(-2px);
+    }
+
+    /* === 3. 毛玻璃卡片通用样式 === */
+    .glass-card {
+      background: var(--glass-bg);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--glass-border);
+      border-radius: 24px;
+      box-shadow: var(--shadow-light);
+      transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      height: 100%;
+    }
+    .glass-card:hover {
+      transform: translateY(-8px);
+      box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+      border-color: #fff;
+    }
+
+    /* === 4. 统计卡片特殊样式 === */
+    .stat-icon-box {
+      width: 56px;
+      height: 56px;
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.6rem;
+      margin-bottom: 15px;
+      color: white;
+      box-shadow: 0 8px 15px rgba(0,0,0,0.1);
+    }
+    .bg-gradient-red { background: linear-gradient(135deg, #ff7675, #d63031); }
+    .bg-gradient-blue { background: linear-gradient(135deg, #74b9ff, #0984e3); }
+    .bg-gradient-purple { background: linear-gradient(135deg, #a29bfe, #6c5ce7); }
+    .bg-gradient-teal { background: linear-gradient(135deg, #55efc4, #00b894); }
+
+    /* 按钮美化 */
+    .btn-glow {
+      border: none;
+      border-radius: 12px;
+      padding: 8px 16px;
+      font-weight: 600;
+      transition: all 0.3s;
+      position: relative;
+      overflow: hidden;
+    }
+    .btn-glow::after {
+      content: '';
+      position: absolute;
+      top: 0; left: -100%;
+      width: 100%; height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+      transition: 0.5s;
+    }
+    .btn-glow:hover::after { left: 100%; }
+
+    /* === 5. 表格与列表美化 === */
+    .custom-table th {
+      background: transparent;
+      border-bottom: 2px solid rgba(0,0,0,0.05);
+      color: #b2bec3;
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    .custom-table tr {
+      transition: background 0.2s;
+      border-bottom: 1px solid rgba(0,0,0,0.02);
+    }
+    .custom-table tr:hover {
+      background: rgba(255,255,255,0.4);
+    }
+    .badge-pill {
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+
+    /* === 6. 动画入场 === */
+    .animate-enter {
+      opacity: 0;
+      animation: fadeInUp 0.8s forwards;
+    }
+    .delay-1 { animation-delay: 0.1s; }
+    .delay-2 { animation-delay: 0.2s; }
+    .delay-3 { animation-delay: 0.3s; }
+    .delay-4 { animation-delay: 0.4s; }
+
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(30px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
   </style>
 </head>
 <body>
-<div class="hero-section">
-  <div class="container text-center">
-    <h1 class="display-5 fw-bold mb-2"><i class="bi bi-snow2"></i> 冰箱守卫者</h1>
-    <p class="opacity-75">让每一份食材都发挥它的价值</p>
-    <div class="mt-3">
-      <button onclick="doLogout()" class="btn btn-outline-light btn-sm rounded-pill px-3">退出登录 <span id="currentUser"></span></button>
+
+<div class="background-blobs">
+  <div class="blob blob-1"></div>
+  <div class="blob blob-2"></div>
+  <div class="blob blob-3"></div>
+</div>
+
+<div class="hero-section animate-enter">
+  <div class="container">
+    <h1 class="display-4 app-title"><i class="bi bi-snow2"></i> 冰箱守卫者</h1>
+    <p class="text-muted mb-4" style="font-size: 1.1rem;">让每一份食材都发挥它的价值，拒绝浪费。</p>
+
+    <div class="d-inline-flex align-items-center glass-pill">
+      <i class="bi bi-person-circle me-2"></i>
+      <span id="currentUser" class="me-3">未登录</span>
+      <button onclick="doLogout()" class="btn btn-link p-0 text-decoration-none text-danger" style="font-size: 0.9rem;">
+        <i class="bi bi-box-arrow-right"></i> 退出
+      </button>
     </div>
   </div>
 </div>
 
 <div class="container mb-5">
   <div class="row g-4 mb-5">
-    <div class="col-md-3">
-      <div class="stat-card p-4 card">
-        <div class="icon-box bg-gradient-danger"><i class="bi bi-alarm"></i></div>
-        <h6 class="text-muted mb-1">临期提醒</h6>
-        <h3 class="fw-bold mb-0" id="expiringCount">0</h3>
-        <small class="text-danger">需尽快处理</small>
+    <div class="col-md-3 animate-enter delay-1">
+      <div class="glass-card p-4 position-relative overflow-hidden">
+        <div class="stat-icon-box bg-gradient-red">
+          <i class="bi bi-alarm-fill"></i>
+        </div>
+        <h6 class="text-muted text-uppercase fw-bold" style="font-size: 0.8rem;">临期提醒</h6>
+        <div class="d-flex align-items-end justify-content-between">
+          <h2 class="fw-bold mb-0 text-danger" id="expiringCount">0</h2>
+          <small class="badge bg-danger-subtle text-danger rounded-pill">需处理</small>
+        </div>
       </div>
     </div>
-    <div class="col-md-3">
-      <div class="stat-card p-4 card">
-        <div class="icon-box bg-gradient-primary"><i class="bi bi-lightning-charge"></i></div>
-        <h6 class="text-muted mb-1">快速录入</h6>
-        <div class="mt-2"><a href="/food/add-page" class="btn btn-sm btn-primary btn-action bg-gradient-primary"><i class="bi bi-plus-lg"></i> 新增食材</a></div>
+
+    <div class="col-md-3 animate-enter delay-2">
+      <div class="glass-card p-4">
+        <div class="stat-icon-box bg-gradient-blue">
+          <i class="bi bi-plus-lg"></i>
+        </div>
+        <h6 class="text-muted text-uppercase fw-bold" style="font-size: 0.8rem;">快速操作</h6>
+        <div class="mt-3">
+          <a href="/food/add-page" class="btn btn-primary btn-glow w-100 bg-gradient-blue border-0 shadow-sm">
+            录入食材
+          </a>
+        </div>
       </div>
     </div>
-    <div class="col-md-3">
-      <div class="stat-card p-4 card">
-        <div class="icon-box bg-gradient-success"><i class="bi bi-robot"></i></div>
-        <h6 class="text-muted mb-1">灵感配餐</h6>
-        <div class="mt-2"><a href="/ai/recipe-page" class="btn btn-sm btn-success btn-action bg-gradient-success text-white"><i class="bi bi-stars"></i> AI 智能助手</a></div>
+
+    <div class="col-md-3 animate-enter delay-3">
+      <div class="glass-card p-4">
+        <div class="stat-icon-box bg-gradient-teal">
+          <i class="bi bi-stars"></i>
+        </div>
+        <h6 class="text-muted text-uppercase fw-bold" style="font-size: 0.8rem;">AI 助手</h6>
+        <div class="mt-3">
+          <a href="/ai/recipe-page" class="btn btn-success btn-glow w-100 bg-gradient-teal border-0 shadow-sm">
+            生成菜谱
+          </a>
+        </div>
       </div>
     </div>
-    <div class="col-md-3">
-      <div class="stat-card p-4 card">
-        <div class="icon-box bg-gradient-info"><i class="bi bi-check2-circle"></i></div>
-        <h6 class="text-muted mb-1">本月贡献</h6>
-        <h3 class="fw-bold mb-0" id="totalProcessed">0</h3>
-        <small class="text-info">食材已妥善处理</small>
+
+    <div class="col-md-3 animate-enter delay-4">
+      <div class="glass-card p-4">
+        <div class="stat-icon-box bg-gradient-purple">
+          <i class="bi bi-trophy-fill"></i>
+        </div>
+        <h6 class="text-muted text-uppercase fw-bold" style="font-size: 0.8rem;">本月贡献</h6>
+        <div class="d-flex align-items-end justify-content-between">
+          <h2 class="fw-bold mb-0 text-primary" id="totalProcessed">0</h2>
+          <small class="text-muted">份食材</small>
+        </div>
       </div>
     </div>
   </div>
 
-  <div class="row g-4">
+  <div class="row g-4 animate-enter delay-4">
     <div class="col-lg-7">
-      <div class="glass-panel h-100">
+      <div class="glass-card p-4 h-100">
         <div class="d-flex justify-content-between align-items-center mb-4">
-          <h5 class="fw-bold mb-0"><i class="bi bi-clock-history me-2"></i>预警清单</h5>
-          <a href="/food/list-page" class="btn btn-link text-decoration-none p-0">查看全部</a>
+          <h5 class="fw-bold mb-0 text-dark">
+            <i class="bi bi-hourglass-split me-2 text-warning"></i> 预警清单
+          </h5>
+          <a href="/food/list-page" class="btn btn-sm btn-light rounded-pill px-3 shadow-sm">
+            全部库存 <i class="bi bi-arrow-right-short"></i>
+          </a>
         </div>
 
-        <div id="emptyState" class="text-center py-5 opacity-50" style="display:none">
-          <i class="bi bi-cup-hot display-4"></i>
-          <p class="mt-3">太棒了，目前没有即将过期的食材</p>
+        <div id="emptyState" class="text-center py-5" style="display:none">
+          <div class="mb-3">
+            <i class="bi bi-check-circle-fill text-success display-4 opacity-50"></i>
+          </div>
+          <p class="text-muted fw-bold">冰箱很安全，没有临期食材！</p>
         </div>
 
         <div class="table-responsive">
-          <table class="table align-middle" id="expiringTable">
-            <thead><tr><th>食材</th><th>过期日期</th><th>倒计时</th></tr></thead>
+          <table class="table custom-table align-middle" id="expiringTable">
+            <thead>
+            <tr>
+              <th style="width: 40%">食材名称</th>
+              <th>过期时间</th>
+              <th class="text-end">倒计时</th>
+            </tr>
+            </thead>
             <tbody id="tableBody">
             </tbody>
           </table>
@@ -95,9 +297,11 @@
     </div>
 
     <div class="col-lg-5">
-      <div class="glass-panel h-100">
-        <h5 class="fw-bold mb-4"><i class="bi bi-pie-chart me-2"></i>处理偏好</h5>
-        <div id="statisticsChart" style="width: 100%; height: 320px"></div>
+      <div class="glass-card p-4 h-100">
+        <h5 class="fw-bold mb-4 text-dark">
+          <i class="bi bi-pie-chart-fill me-2 text-primary"></i> 消耗分析
+        </h5>
+        <div id="statisticsChart" style="width: 100%; height: 320px;"></div>
       </div>
     </div>
   </div>
@@ -105,79 +309,142 @@
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-  // 1. 全局 Token 检查
+  // === 逻辑部分保持不变，只是适配了新的 CSS 类名 ===
+
   const token = localStorage.getItem("fg_token");
   if (!token) {
-    window.location.href = "/login"; // 没登录就踢走
-  }
-  document.getElementById("currentUser").textContent = localStorage.getItem("fg_user") || "";
-
-  function doLogout() {
-    localStorage.removeItem("fg_token");
     window.location.href = "/login";
   }
+  document.getElementById("currentUser").textContent = localStorage.getItem("fg_user") || "用户";
 
-  // 封装带 Token 的请求
+  function doLogout() {
+    if(confirm("确定要退出登录吗？")) {
+      localStorage.removeItem("fg_token");
+      window.location.href = "/login";
+    }
+  }
+
   async function fetchWithAuth(url) {
     const res = await fetch(url, {
       headers: { "Authorization": token }
     });
     if (res.status === 401) {
-      doLogout(); // Token 过期
+      localStorage.removeItem("fg_token");
+      window.location.href = "/login";
     }
     return res.json();
   }
 
-  // 2. 加载数据
   async function initDashboard() {
-    // 加载统计
-    const statRes = await fetchWithAuth("/api/food/statistics");
-    if (statRes.code === 200) {
-      const stats = statRes.data;
-      document.getElementById("totalProcessed").textContent = stats.total || 0;
-      initChart(stats);
-    }
-
-    // 加载临期列表
-    const expireRes = await fetchWithAuth("/api/food/expiring"); // 需要后端加这个接口
-    if (expireRes.code === 200) {
-      const list = expireRes.data;
-      document.getElementById("expiringCount").textContent = list.length;
-
-      const tbody = document.getElementById("tableBody");
-      tbody.innerHTML = "";
-
-      if(list.length === 0) {
-        document.getElementById("emptyState").style.display = "block";
-        document.getElementById("expiringTable").style.display = "none";
-      } else {
-        list.forEach(item => {
-          const tr = document.createElement("tr");
-          const badgeClass = item.daysLeft <= 1 ? 'bg-danger-subtle text-danger' : 'bg-warning-subtle text-warning';
-          tr.innerHTML = `
-                        <td><div class="fw-bold">${item.name}</div><small class="text-muted">${item.storageLocation || '冷藏'}</small></td>
-                        <td class="text-muted">${item.expiryDate}</td>
-                        <td><span class="badge-custom ${badgeClass}">${item.daysLeft} 天</span></td>
-                      `;
-          tbody.appendChild(tr);
-        });
+    // 1. 加载统计
+    try {
+      const statRes = await fetchWithAuth("/api/food/statistics");
+      if (statRes.code === 200) {
+        const stats = statRes.data;
+        // 增加数字滚动特效
+        animateValue("totalProcessed", 0, stats.total || 0, 1000);
+        initChart(stats);
       }
-    }
+    } catch(e) { console.error(e); }
+
+    // 2. 加载临期列表
+    try {
+      const expireRes = await fetchWithAuth("/api/food/expiring");
+      if (expireRes.code === 200) {
+        const list = expireRes.data;
+        animateValue("expiringCount", 0, list.length, 1000);
+
+        const tbody = document.getElementById("tableBody");
+        tbody.innerHTML = "";
+
+        if(list.length === 0) {
+          document.getElementById("emptyState").style.display = "block";
+          document.getElementById("expiringTable").style.display = "none";
+        } else {
+          list.forEach(item => {
+            const tr = document.createElement("tr");
+            const isUrgent = item.daysLeft <= 1;
+            const badgeClass = isUrgent ? 'bg-danger text-white shadow-sm' : 'bg-warning text-dark';
+            const icon = isUrgent ? '<i class="bi bi-exclamation-circle-fill me-1"></i>' : '';
+
+            tr.innerHTML = `
+              <td>
+                <div class="d-flex align-items-center">
+                  <div class="rounded-circle bg-light d-flex align-items-center justify-content-center me-3" style="width:40px;height:40px;">
+                    <i class="bi bi-basket text-secondary"></i>
+                  </div>
+                  <div>
+                    <div class="fw-bold text-dark">${item.name}</div>
+                    <small class="text-muted" style="font-size:0.75rem">${item.storageLocation || '冷藏'}</small>
+                  </div>
+                </div>
+              </td>
+              <td class="text-muted fw-medium">${item.expiryDate}</td>
+              <td class="text-end">
+                <span class="badge-pill ${badgeClass}">
+                  ${icon}${item.daysLeft} 天
+                </span>
+              </td>
+            `;
+            tbody.appendChild(tr);
+          });
+        }
+      }
+    } catch(e) { console.error(e); }
+  }
+
+  // 数字滚动动画函数
+  function animateValue(id, start, end, duration) {
+    const obj = document.getElementById(id);
+    let startTimestamp = null;
+    const step = (timestamp) => {
+      if (!startTimestamp) startTimestamp = timestamp;
+      const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+      obj.innerHTML = Math.floor(progress * (end - start) + start);
+      if (progress < 1) {
+        window.requestAnimationFrame(step);
+      }
+    };
+    window.requestAnimationFrame(step);
   }
 
   function initChart(stats) {
     const chart = echarts.init(document.getElementById("statisticsChart"));
     const option = {
-      tooltip: { trigger: "item", formatter: "{b}: <b>{c}</b> ({d}%)" },
-      legend: { bottom: "0" },
+      color: ['#00b894', '#ff7675'], // 适配新配色的 绿色和红色
+      tooltip: {
+        trigger: "item",
+        backgroundColor: 'rgba(255, 255, 255, 0.9)',
+        borderWidth: 0,
+        textStyle: { color: '#2d3436' },
+        formatter: "{b}: <b>{c}</b> ({d}%)"
+      },
+      legend: { bottom: "0", itemGap: 20 },
       series: [{
-        name: "处理状态", type: "pie", radius: ["55%", "80%"],
+        name: "处理状态",
+        type: "pie",
+        radius: ["50%", "75%"],
+        center: ['50%', '45%'],
         avoidLabelOverlap: false,
-        itemStyle: { borderRadius: 15, borderColor: "#fff", borderWidth: 5 },
+        itemStyle: {
+          borderRadius: 10,
+          borderColor: '#fff',
+          borderWidth: 2
+        },
         label: { show: false },
+        emphasis: {
+          scale: true,
+          scaleSize: 10,
+          label: {
+            show: true,
+            fontSize: 16,
+            fontWeight: 'bold',
+            color: '#2d3436'
+          }
+        },
         data: [
-          { value: stats.consumed || 0, name: "健康食用", itemStyle: { color: "#2ECC71" } },
-          { value: stats.wasted || 0, name: "不幸浪费", itemStyle: { color: "#FF7675" } }
+          { value: stats.consumed || 0, name: "健康食用" },
+          { value: stats.wasted || 0, name: "遗憾浪费" }
         ]
       }]
     };
@@ -185,7 +452,6 @@
     window.addEventListener("resize", () => chart.resize());
   }
 
-  // 启动!
   initDashboard();
 </script>
 </body>
