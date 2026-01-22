@@ -265,6 +265,28 @@
             }
 
             res.data.forEach((food) => {
+              // ================= [核心修改] 人性化日期逻辑 =================
+              let daysText = "";
+              let daysClass = "text-muted"; // 默认灰色
+
+              if (food.daysLeft < 0) {
+                daysText = `已过期 ${Math.abs(food.daysLeft)} 天`;
+                daysClass = "text-danger fw-bold"; // 红色加粗
+              } else if (food.daysLeft === 0) {
+                daysText = "今天内过期 ⚠️";
+                daysClass = "text-danger fw-bold"; // 红色加粗
+              } else if (food.daysLeft === 1) {
+                daysText = "明天过期";
+                daysClass = "text-warning fw-bold"; // 橙色
+              } else if (food.daysLeft === 2) {
+                daysText = "后天过期";
+                daysClass = "text-warning"; // 黄色
+              } else {
+                daysText = `${food.daysLeft} 天后过期`;
+                // 默认为灰色
+              }
+              // ========================================================
+
               // 创建胶囊卡片
               const item = document.createElement("div");
               item.className = "check-card";
@@ -272,8 +294,8 @@
              <div class="check-icon"><i class="bi bi-check-lg"></i></div>
              <div class="flex-grow-1">
                  <div class="fw-bold text-dark">${food.name}</div>
-                 <small class="text-muted" style="font-size:0.75rem">
-                    ${food.daysLeft}天后过期 · ${food.quantity}${food.unit||''}
+                 <small class="${daysClass}" style="font-size:0.75rem">
+                    ${daysText} · ${food.quantity}${food.unit||''}
                  </small>
              </div>
              <input type="checkbox" value="${food.id}">
@@ -281,7 +303,7 @@
 
               // 点击交互事件
               item.onclick = (e) => {
-                // 阻止事件冒泡，防止点到 checkbox 自己触发两次
+                // 阻止事件冒泡
                 if (e.target.tagName === 'INPUT') return;
 
                 const checkbox = item.querySelector("input");
@@ -304,7 +326,6 @@
     const ids = Array.from(document.querySelectorAll("input:checked")).map(i => i.value);
 
     if (ids.length === 0) {
-      // 简单的抖动提醒
       const btn = document.querySelector('.btn-magic');
       btn.classList.add('bg-danger');
       btn.innerText = "请至少选一个食材！";
