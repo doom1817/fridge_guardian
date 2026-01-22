@@ -14,7 +14,7 @@ import java.util.List;
  *
  * @Author: doom
  * @Date: 2026/01/21/15:50
- * @Description: 负责页面跳转。它返回 String（Thymeleaf 模板路径），通过 Model 对象传参。
+ * @Description: 负责页面跳转。它现在只负责“开门”
  * 负责直接在浏览器地址栏敲 URL 时显示的页面。
  */
 @Controller
@@ -24,21 +24,19 @@ public class PageController {
 
     // 首页：展示临期提醒、概览数据
     @GetMapping("/")
-    public String index(Model model) {
-        model.addAttribute("expiringList", foodItemService.getExpiringSoon(3));
-        return "index"; // 对应 templates/index.html
+    public String index() {
+        return "index"; // 返回 index.html，数据由 JS 加载
+    }
+    //登录页
+    @GetMapping("/login")
+    public String login() {
+        return "login";
     }
 
     // 食材列表页
     @GetMapping("/food/list-page")
-    public String foodListPage(Model model) {
-        List<FoodItem> list = foodItemService.lambdaQuery()
-                .eq(FoodItem::getStatus, 0)
-                .orderByAsc(FoodItem::getExpiryDate)
-                .list();
-        list.forEach(foodItemService::calculateDaysLeft);
-        model.addAttribute("foods", list);
-        return "food_list"; // 对应 templates/food_list.html
+    public String foodListPage() {
+        return "food_list";
     }
 
     // 新增食材表单页

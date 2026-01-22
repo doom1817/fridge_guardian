@@ -153,6 +153,8 @@
     </div>
 
     <script>
+      const token = localStorage.getItem("fg_token");
+      if (!token) window.location.href = "/login";
       // 加载食材
       fetch("/api/food/list")
         .then((res) => res.json())
@@ -192,7 +194,7 @@
 
         fetch("/api/ai/generate-recipe", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json" ,"Authorization": token},
           body: JSON.stringify(ids),
         })
           .then((res) => res.json())

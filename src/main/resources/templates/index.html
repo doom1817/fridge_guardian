@@ -1,353 +1,192 @@
 <!doctype html>
-<html xmlns:th="http://www.thymeleaf.org">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>冰箱守卫者 - 智能食材管理</title>
-    <!-- 引入 Google Fonts 提升质感 -->
-    <link
-      href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;700&display=swap"
-      rel="stylesheet"
-    />
-    <link
-      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
-      rel="stylesheet"
-    />
-    <link
-      href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css"
-      rel="stylesheet"
-    />
-    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
-    <style>
-      :root {
-        --glass-bg: rgba(255, 255, 255, 0.7);
-        --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        --fresh-gradient: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
-        --danger-gradient: linear-gradient(135deg, #ff0844 0%, #ffb199 100%);
-        --info-gradient: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-      }
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>冰箱守卫者 - 智能食材管理</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;700&display=swap" rel="stylesheet" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+  <style>
+    /* 保持你原有的 CSS 样式不变 */
+    :root { --glass-bg: rgba(255, 255, 255, 0.7); --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%); --fresh-gradient: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); --danger-gradient: linear-gradient(135deg, #ff0844 0%, #ffb199 100%); --info-gradient: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); }
+    body { background: #f0f2f5; font-family: "Noto Sans SC", sans-serif; color: #2d3436; }
+    .hero-section { background: var(--primary-gradient); padding: 60px 0 120px 0; color: white; border-radius: 0 0 50px 50px; margin-bottom: -60px; }
+    .stat-card { border: none; border-radius: 20px; transition: all 0.3s; overflow: hidden; background: var(--glass-bg); box-shadow: 0 10px 20px rgba(0, 0, 0, 0.05); }
+    .stat-card:hover { transform: translateY(-10px); box-shadow: 0 15px 30px rgba(0, 0, 0, 0.1); }
+    .icon-box { width: 50px; height: 50px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; margin-bottom: 15px; color: white; }
+    .bg-gradient-danger { background: var(--danger-gradient); }
+    .bg-gradient-primary { background: var(--primary-gradient); }
+    .bg-gradient-success { background: var(--fresh-gradient); }
+    .bg-gradient-info { background: var(--info-gradient); }
+    .btn-action { border-radius: 12px; padding: 10px 20px; font-weight: 500; border: none; }
+    .glass-panel { background: var(--glass-bg); border-radius: 25px; padding: 25px; border: 1px solid rgba(255, 255, 255, 0.3); }
+    .table { --bs-table-bg: transparent; }
+    .badge-custom { padding: 6px 12px; border-radius: 8px; font-weight: 600; }
+  </style>
+</head>
+<body>
+<div class="hero-section">
+  <div class="container text-center">
+    <h1 class="display-5 fw-bold mb-2"><i class="bi bi-snow2"></i> 冰箱守卫者</h1>
+    <p class="opacity-75">让每一份食材都发挥它的价值</p>
+    <div class="mt-3">
+      <button onclick="doLogout()" class="btn btn-outline-light btn-sm rounded-pill px-3">退出登录 <span id="currentUser"></span></button>
+    </div>
+  </div>
+</div>
 
-      body {
-        background: #f0f2f5;
-        font-family: "Noto Sans SC", sans-serif;
-        color: #2d3436;
-      }
-
-      /* Hero 欢迎区域 */
-      .hero-section {
-        background: var(--primary-gradient);
-        padding: 60px 0 120px 0;
-        color: white;
-        border-radius: 0 0 50px 50px;
-        margin-bottom: -60px;
-      }
-
-      /* 灵动卡片样式 */
-      .stat-card {
-        border: none;
-        border-radius: 20px;
-        transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
-        overflow: hidden;
-        background: var(--glass-bg);
-        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.05);
-      }
-
-      .stat-card:hover {
-        transform: translateY(-10px);
-        box-shadow: 0 15px 30px rgba(0, 0, 0, 0.1);
-      }
-
-      .icon-box {
-        width: 50px;
-        height: 50px;
-        border-radius: 12px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 1.5rem;
-        margin-bottom: 15px;
-        color: white;
-      }
-
-      /* 各类渐变装饰 */
-      .bg-gradient-danger {
-        background: var(--danger-gradient);
-      }
-      .bg-gradient-primary {
-        background: var(--primary-gradient);
-      }
-      .bg-gradient-success {
-        background: var(--fresh-gradient);
-      }
-      .bg-gradient-info {
-        background: var(--info-gradient);
-      }
-
-      /* 快速操作按钮美化 */
-      .btn-action {
-        border-radius: 12px;
-        padding: 10px 20px;
-        font-weight: 500;
-        transition: all 0.2s;
-        border: none;
-      }
-      .btn-action:hover {
-        transform: scale(1.05);
-        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
-      }
-
-      /* 表格区域美化 */
-      .glass-panel {
-        background: var(--glass-bg);
-        border-radius: 25px;
-        padding: 25px;
-        border: 1px solid rgba(255, 255, 255, 0.3);
-        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.03);
-      }
-
-      .table {
-        --bs-table-bg: transparent;
-      }
-
-      .table thead th {
-        border-top: none;
-        background: rgba(0, 0, 0, 0.02);
-        color: #636e72;
-        font-weight: 600;
-        text-transform: uppercase;
-        font-size: 0.8rem;
-        letter-spacing: 1px;
-      }
-
-      /* 过期天数标签 */
-      .badge-custom {
-        padding: 6px 12px;
-        border-radius: 8px;
-        font-weight: 600;
-      }
-
-      /* 图表容器 */
-      #statisticsChart {
-        border-radius: 20px;
-      }
-
-      /* 响应式调整 */
-      @media (max-width: 768px) {
-        .hero-section {
-          padding: 40px 0 100px 0;
-        }
-      }
-    </style>
-  </head>
-  <body>
-    <!-- Hero Section -->
-    <div class="hero-section">
-      <div class="container text-center">
-        <h1 class="display-5 fw-bold mb-2">
-          <i class="bi bi-snow2"></i> 冰箱守卫者
-        </h1>
-        <p class="opacity-75">让每一份食材都发挥它的价值</p>
+<div class="container mb-5">
+  <div class="row g-4 mb-5">
+    <div class="col-md-3">
+      <div class="stat-card p-4 card">
+        <div class="icon-box bg-gradient-danger"><i class="bi bi-alarm"></i></div>
+        <h6 class="text-muted mb-1">临期提醒</h6>
+        <h3 class="fw-bold mb-0" id="expiringCount">0</h3>
+        <small class="text-danger">需尽快处理</small>
       </div>
     </div>
-
-    <div class="container mb-5">
-      <!-- 统计卡片行 -->
-      <div class="row g-4 mb-5">
-        <div class="col-md-3">
-          <div class="stat-card p-4 card">
-            <div class="icon-box bg-gradient-danger">
-              <i class="bi bi-alarm"></i>
-            </div>
-            <h6 class="text-muted mb-1">临期提醒</h6>
-            <h3 class="fw-bold mb-0" th:text="${expiringList.size()}">0</h3>
-            <small class="text-danger">需尽快处理</small>
-          </div>
-        </div>
-        <div class="col-md-3">
-          <div class="stat-card p-4 card">
-            <div class="icon-box bg-gradient-primary">
-              <i class="bi bi-lightning-charge"></i>
-            </div>
-            <h6 class="text-muted mb-1">快速录入</h6>
-            <div class="mt-2">
-              <a
-                href="/food/add-page"
-                class="btn btn-sm btn-primary btn-action bg-gradient-primary"
-              >
-                <i class="bi bi-plus-lg"></i> 新增食材
-              </a>
-            </div>
-          </div>
-        </div>
-        <div class="col-md-3">
-          <div class="stat-card p-4 card">
-            <div class="icon-box bg-gradient-success">
-              <i class="bi bi-robot"></i>
-            </div>
-            <h6 class="text-muted mb-1">灵感配餐</h6>
-            <div class="mt-2">
-              <a
-                href="/ai/recipe-page"
-                class="btn btn-sm btn-success btn-action bg-gradient-success text-white"
-              >
-                <i class="bi bi-stars"></i> AI 智能助手
-              </a>
-            </div>
-          </div>
-        </div>
-        <div class="col-md-3">
-          <div class="stat-card p-4 card">
-            <div class="icon-box bg-gradient-info">
-              <i class="bi bi-check2-circle"></i>
-            </div>
-            <h6 class="text-muted mb-1">本月贡献</h6>
-            <h3 class="fw-bold mb-0" id="totalProcessed">0</h3>
-            <small class="text-info">食材已妥善处理</small>
-          </div>
-        </div>
+    <div class="col-md-3">
+      <div class="stat-card p-4 card">
+        <div class="icon-box bg-gradient-primary"><i class="bi bi-lightning-charge"></i></div>
+        <h6 class="text-muted mb-1">快速录入</h6>
+        <div class="mt-2"><a href="/food/add-page" class="btn btn-sm btn-primary btn-action bg-gradient-primary"><i class="bi bi-plus-lg"></i> 新增食材</a></div>
       </div>
+    </div>
+    <div class="col-md-3">
+      <div class="stat-card p-4 card">
+        <div class="icon-box bg-gradient-success"><i class="bi bi-robot"></i></div>
+        <h6 class="text-muted mb-1">灵感配餐</h6>
+        <div class="mt-2"><a href="/ai/recipe-page" class="btn btn-sm btn-success btn-action bg-gradient-success text-white"><i class="bi bi-stars"></i> AI 智能助手</a></div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="stat-card p-4 card">
+        <div class="icon-box bg-gradient-info"><i class="bi bi-check2-circle"></i></div>
+        <h6 class="text-muted mb-1">本月贡献</h6>
+        <h3 class="fw-bold mb-0" id="totalProcessed">0</h3>
+        <small class="text-info">食材已妥善处理</small>
+      </div>
+    </div>
+  </div>
 
-      <div class="row g-4">
-        <!-- 左侧：临期清单 -->
-        <div class="col-lg-7">
-          <div class="glass-panel h-100">
-            <div class="d-flex justify-content-between align-items-center mb-4">
-              <h5 class="fw-bold mb-0">
-                <i class="bi bi-clock-history me-2"></i>预警清单
-              </h5>
-              <a
-                href="/food/list-page"
-                class="btn btn-link text-decoration-none p-0"
-                >查看全部</a
-              >
-            </div>
-
-            <div
-              th:if="${expiringList == null || expiringList.isEmpty()}"
-              class="text-center py-5 opacity-50"
-            >
-              <i class="bi bi-cup-hot display-4"></i>
-              <p class="mt-3">太棒了，目前没有即将过期的食材</p>
-            </div>
-
-            <div
-              class="table-responsive"
-              th:if="${expiringList != null && !expiringList.isEmpty()}"
-            >
-              <table class="table align-middle">
-                <thead>
-                  <tr>
-                    <th>食材</th>
-                    <th>过期日期</th>
-                    <th>倒计时</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr th:each="food : ${expiringList}">
-                    <td>
-                      <div class="fw-bold" th:text="${food.name}">西红柿</div>
-                      <small
-                        class="text-muted"
-                        th:text="${food.storageLocation}"
-                        >冷藏</small
-                      >
-                    </td>
-                    <td class="text-muted" th:text="${food.expiryDate}">
-                      2024-05-23
-                    </td>
-                    <td>
-                      <span
-                        th:class="'badge-custom ' + (${food.daysLeft <= 1} ? 'bg-danger-subtle text-danger' : 'bg-warning-subtle text-warning')"
-                        th:text="${food.daysLeft + ' 天'}"
-                        >3 天</span
-                      >
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
+  <div class="row g-4">
+    <div class="col-lg-7">
+      <div class="glass-panel h-100">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+          <h5 class="fw-bold mb-0"><i class="bi bi-clock-history me-2"></i>预警清单</h5>
+          <a href="/food/list-page" class="btn btn-link text-decoration-none p-0">查看全部</a>
         </div>
 
-        <!-- 右侧：统计图表 -->
-        <div class="col-lg-5">
-          <div class="glass-panel h-100">
-            <h5 class="fw-bold mb-4">
-              <i class="bi bi-pie-chart me-2"></i>处理偏好
-            </h5>
-            <div id="statisticsChart" style="width: 100%; height: 320px"></div>
-          </div>
+        <div id="emptyState" class="text-center py-5 opacity-50" style="display:none">
+          <i class="bi bi-cup-hot display-4"></i>
+          <p class="mt-3">太棒了，目前没有即将过期的食材</p>
+        </div>
+
+        <div class="table-responsive">
+          <table class="table align-middle" id="expiringTable">
+            <thead><tr><th>食材</th><th>过期日期</th><th>倒计时</th></tr></thead>
+            <tbody id="tableBody">
+            </tbody>
+          </table>
         </div>
       </div>
     </div>
 
-    <script>
-      // 动态获取统计数据并渲染图表
-      fetch("/api/food/statistics")
-        .then((res) => res.json())
-        .then((res) => {
-          if (res.code === 200) {
-            const stats = res.data;
-            document.getElementById("totalProcessed").textContent =
-              stats.total || 0;
+    <div class="col-lg-5">
+      <div class="glass-panel h-100">
+        <h5 class="fw-bold mb-4"><i class="bi bi-pie-chart me-2"></i>处理偏好</h5>
+        <div id="statisticsChart" style="width: 100%; height: 320px"></div>
+      </div>
+    </div>
+  </div>
+</div>
 
-            const chart = echarts.init(
-              document.getElementById("statisticsChart"),
-            );
-            const option = {
-              tooltip: {
-                trigger: "item",
-                padding: 10,
-                borderRadius: 10,
-                formatter: "{b}: <b>{c}</b> ({d}%)",
-              },
-              legend: {
-                bottom: "0",
-                left: "center",
-                itemWidth: 10,
-                itemHeight: 10,
-              },
-              series: [
-                {
-                  name: "处理状态",
-                  type: "pie",
-                  radius: ["55%", "80%"],
-                  avoidLabelOverlap: false,
-                  itemStyle: {
-                    borderRadius: 15,
-                    borderColor: "#fff",
-                    borderWidth: 5,
-                  },
-                  label: { show: false },
-                  emphasis: {
-                    label: {
-                      show: true,
-                      fontSize: "14",
-                      fontWeight: "bold",
-                    },
-                  },
-                  data: [
-                    {
-                      value: stats.consumed || 0,
-                      name: "健康食用",
-                      itemStyle: { color: "#2ECC71" },
-                    },
-                    {
-                      value: stats.wasted || 0,
-                      name: "不幸浪费",
-                      itemStyle: { color: "#FF7675" },
-                    },
-                  ],
-                },
-              ],
-            };
-            chart.setOption(option);
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+  // 1. 全局 Token 检查
+  const token = localStorage.getItem("fg_token");
+  if (!token) {
+    window.location.href = "/login"; // 没登录就踢走
+  }
+  document.getElementById("currentUser").textContent = localStorage.getItem("fg_user") || "";
 
-            // 响应式调整图表
-            window.addEventListener("resize", () => chart.resize());
-          }
+  function doLogout() {
+    localStorage.removeItem("fg_token");
+    window.location.href = "/login";
+  }
+
+  // 封装带 Token 的请求
+  async function fetchWithAuth(url) {
+    const res = await fetch(url, {
+      headers: { "Authorization": token }
+    });
+    if (res.status === 401) {
+      doLogout(); // Token 过期
+    }
+    return res.json();
+  }
+
+  // 2. 加载数据
+  async function initDashboard() {
+    // 加载统计
+    const statRes = await fetchWithAuth("/api/food/statistics");
+    if (statRes.code === 200) {
+      const stats = statRes.data;
+      document.getElementById("totalProcessed").textContent = stats.total || 0;
+      initChart(stats);
+    }
+
+    // 加载临期列表
+    const expireRes = await fetchWithAuth("/api/food/expiring"); // 需要后端加这个接口
+    if (expireRes.code === 200) {
+      const list = expireRes.data;
+      document.getElementById("expiringCount").textContent = list.length;
+
+      const tbody = document.getElementById("tableBody");
+      tbody.innerHTML = "";
+
+      if(list.length === 0) {
+        document.getElementById("emptyState").style.display = "block";
+        document.getElementById("expiringTable").style.display = "none";
+      } else {
+        list.forEach(item => {
+          const tr = document.createElement("tr");
+          const badgeClass = item.daysLeft <= 1 ? 'bg-danger-subtle text-danger' : 'bg-warning-subtle text-warning';
+          tr.innerHTML = `
+                        <td><div class="fw-bold">${item.name}</div><small class="text-muted">${item.storageLocation || '冷藏'}</small></td>
+                        <td class="text-muted">${item.expiryDate}</td>
+                        <td><span class="badge-custom ${badgeClass}">${item.daysLeft} 天</span></td>
+                      `;
+          tbody.appendChild(tr);
         });
-    </script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-  </body>
+      }
+    }
+  }
+
+  function initChart(stats) {
+    const chart = echarts.init(document.getElementById("statisticsChart"));
+    const option = {
+      tooltip: { trigger: "item", formatter: "{b}: <b>{c}</b> ({d}%)" },
+      legend: { bottom: "0" },
+      series: [{
+        name: "处理状态", type: "pie", radius: ["55%", "80%"],
+        avoidLabelOverlap: false,
+        itemStyle: { borderRadius: 15, borderColor: "#fff", borderWidth: 5 },
+        label: { show: false },
+        data: [
+          { value: stats.consumed || 0, name: "健康食用", itemStyle: { color: "#2ECC71" } },
+          { value: stats.wasted || 0, name: "不幸浪费", itemStyle: { color: "#FF7675" } }
+        ]
+      }]
+    };
+    chart.setOption(option);
+    window.addEventListener("resize", () => chart.resize());
+  }
+
+  // 启动!
+  initDashboard();
+</script>
+</body>
 </html>

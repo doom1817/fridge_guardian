@@ -151,6 +151,8 @@
     </div>
 
     <script>
+      const token = localStorage.getItem("fg_token");
+      if (!token) window.location.href = "/login";
       // 设置保质期默认为今天
       document.addEventListener("DOMContentLoaded", function () {
         const today = new Date().toISOString().split("T")[0];
@@ -175,7 +177,7 @@
 
         fetch("/api/food/add", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json","Authorization": token },
           body: JSON.stringify(data),
         })
           .then((res) => res.json())

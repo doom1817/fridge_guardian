@@ -51,25 +51,27 @@ public class ShiroConfig {
         // 2. 配置拦截规则（注意顺序：LinkedHashMap）
         Map<String, String> ruleMap = new LinkedHashMap<>();
 
-        // 放行 Swagger 文档（如果有的话）
+        // 3.放行 Knife4j 文档
         ruleMap.put("/doc.html", "anon");
         ruleMap.put("/webjars/**", "anon");
         ruleMap.put("/v3/api-docs/**", "anon");
 
-        // 放行静态资源
+        // 4.放行静态资源
         ruleMap.put("/css/**", "anon");
         ruleMap.put("/js/**", "anon");
         ruleMap.put("/favicon.ico", "anon");
 
-        // 放行 登录 和 注册 接口 (必须！)
+        // 5.放行 登录 和 注册 接口 (必须！)
         ruleMap.put("/api/auth/**", "anon");
+        ruleMap.put("/login", "anon");
 
-        // 首页放行 (如果你希望不登录也能看首页)
+        // 6.放行其他页面 (因为现在页面里没数据，数据都在 API 里保护着，所以可以放行空壳页面)
         ruleMap.put("/", "anon");
-
-        // 剩余所有接口必须通过 jwt 认证
-        ruleMap.put("/**", "jwt");
-
+        ruleMap.put("/food/**", "anon");
+        ruleMap.put("/ai/**", "anon");
+        // 7.拦截所有数据接口
+        ruleMap.put("/api/**", "jwt");
+        ruleMap.put("/**", "anon"); // 兜底放行其他请求
         factoryBean.setFilterChainDefinitionMap(ruleMap);
         return factoryBean;
     }
