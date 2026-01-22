@@ -1,285 +1,178 @@
-<!DOCTYPE html>
-<html lang="zh-CN">
+<!doctype html>
+<html>
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>登录 - 冰箱守卫者</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI 灵感配餐 - 冰箱守卫者</title>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&display=swap" rel="stylesheet" />
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 
   <style>
     :root {
-      --primary-gradient: linear-gradient(135deg, #6c5ce7 0%, #a29bfe 100%);
-      --secondary-gradient: linear-gradient(135deg, #00b894 0%, #55efc4 100%);
-      --glass-bg: rgba(255, 255, 255, 0.85);
-      --glass-border: rgba(255, 255, 255, 0.6);
+      --primary-color: #6c5ce7;
+      --success-color: #00b894;
+      --glass-bg: rgba(255, 255, 255, 0.65);
+      --glass-border: rgba(255, 255, 255, 0.5);
+      --shadow-light: 0 8px 32px 0 rgba(31, 38, 135, 0.15);
     }
 
     body {
       background-color: #dfe6e9;
       font-family: "Noto Sans SC", sans-serif;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      flex-direction: column;
-      height: 100vh;
-      margin: 0;
-      overflow: hidden;
+      min-height: 100vh;
+      overflow-x: hidden;
       position: relative;
     }
 
-    /* === 1. 动态背景光斑 === */
+    /* === 1. 动态背景 (统一风格) === */
     .background-blobs {
-      position: absolute; width: 100%; height: 100%; z-index: -1;
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -1;
     }
     .blob {
-      position: absolute; border-radius: 50%; filter: blur(80px); opacity: 0.6;
-      animation: float 15s infinite ease-in-out;
+      position: absolute; border-radius: 50%; filter: blur(60px); opacity: 0.6;
+      animation: float 10s infinite ease-in-out;
     }
-    .blob-1 { top: -10%; left: -10%; width: 600px; height: 600px; background: #a29bfe; }
-    .blob-2 { bottom: -10%; right: -10%; width: 500px; height: 500px; background: #74b9ff; animation-delay: 2s; }
+    .blob-1 { top: -10%; left: 30%; width: 500px; height: 500px; background: #a29bfe; }
+    .blob-2 { bottom: -10%; right: -10%; width: 400px; height: 400px; background: #55efc4; animation-delay: 2s; }
+
     @keyframes float {
       0%, 100% { transform: translate(0, 0); }
-      50% { transform: translate(50px, -50px); }
+      50% { transform: translate(20px, -40px); }
     }
 
-    /* === 2. 核心容器 === */
-    .container-box {
+    /* === 2. 布局容器 === */
+    .main-container {
+      max-width: 1200px;
+      margin: 40px auto;
+      padding: 0 20px;
+      animation: fadeInUp 0.8s forwards;
+    }
+
+    .glass-panel {
       background: var(--glass-bg);
       backdrop-filter: blur(20px);
-      border-radius: 25px;
-      box-shadow: 0 14px 28px rgba(0,0,0,0.1), 0 10px 10px rgba(0,0,0,0.05);
-      position: relative;
-      overflow: hidden;
-      width: 850px;
-      max-width: 100%;
-      min-height: 550px;
+      -webkit-backdrop-filter: blur(20px);
       border: 1px solid var(--glass-border);
-    }
-
-    /* === 3. 表单区域布局 === */
-    .form-container {
-      position: absolute;
-      top: 0;
+      border-radius: 24px;
+      box-shadow: var(--shadow-light);
+      padding: 30px;
       height: 100%;
-      transition: all 0.6s ease-in-out;
+      min-height: 600px;
+      display: flex;
+      flex-direction: column;
     }
 
-    .sign-in-container {
-      left: 0;
-      width: 50%;
-      z-index: 2;
+    /* === 3. 左侧：食材选择胶囊 === */
+    .ingredient-list {
+      flex: 1;
+      overflow-y: auto;
+      padding-right: 10px;
     }
+    /* 自定义滚动条 */
+    .ingredient-list::-webkit-scrollbar { width: 6px; }
+    .ingredient-list::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.1); border-radius: 10px; }
 
-    .container-box.right-panel-active .sign-in-container {
-      transform: translateX(100%);
-    }
-
-    .sign-up-container {
-      left: 0;
-      width: 50%;
-      opacity: 0;
-      z-index: 1;
-    }
-
-    .container-box.right-panel-active .sign-up-container {
-      transform: translateX(100%);
-      opacity: 1;
-      z-index: 5;
-      animation: show 0.6s;
-    }
-
-    @keyframes show {
-      0%, 49.99% { opacity: 0; z-index: 1; }
-      50%, 100% { opacity: 1; z-index: 5; }
-    }
-
-    /* === 4. 表单样式细节 === */
-    form {
-      background: transparent;
+    .check-card {
+      position: relative;
       display: flex;
       align-items: center;
-      justify-content: center;
-      flex-direction: column;
-      padding: 0 50px;
-      height: 100%;
-      text-align: center;
-    }
-
-    h1 {
-      font-weight: bold;
-      margin: 0 0 20px;
-      color: #2d3436;
-    }
-
-    .social-container {
-      margin: 20px 0;
-    }
-    .social-container a {
-      border: 1px solid #dfe6e9;
-      border-radius: 50%;
-      display: inline-flex;
-      justify-content: center;
-      align-items: center;
-      margin: 0 5px;
-      height: 40px;
-      width: 40px;
-      color: #636e72;
-      text-decoration: none;
-      transition: 0.3s;
-    }
-    .social-container a:hover {
-      background: #fff;
-      color: #6c5ce7;
-      box-shadow: 0 5px 15px rgba(0,0,0,0.1);
-    }
-
-    .input-group-custom {
-      position: relative;
-      width: 100%;
-      margin: 10px 0;
-    }
-
-    .input-group-custom i {
-      position: absolute;
-      left: 15px;
-      top: 50%;
-      transform: translateY(-50%);
-      color: #b2bec3;
-      transition: 0.3s;
-    }
-
-    input {
-      background-color: #f5f6fa;
+      background: rgba(255, 255, 255, 0.5);
       border: 2px solid transparent;
-      padding: 12px 15px 12px 45px;
-      width: 100%;
-      border-radius: 12px;
-      outline: none;
-      font-size: 0.95rem;
-      transition: 0.3s;
-    }
-
-    input:focus {
-      background-color: #fff;
-      border-color: #6c5ce7;
-      box-shadow: 0 0 0 4px rgba(108, 92, 231, 0.1);
-    }
-    input:focus + i { color: #6c5ce7; }
-
-    .btn-grad {
-      background: var(--primary-gradient);
-      color: #ffffff;
-      font-size: 12px;
-      font-weight: bold;
-      padding: 12px 45px;
-      letter-spacing: 1px;
-      text-transform: uppercase;
-      border: none;
-      border-radius: 50px;
+      border-radius: 15px;
+      padding: 12px 15px;
+      margin-bottom: 12px;
       cursor: pointer;
-      transition: transform 80ms ease-in, box-shadow 0.3s;
-      margin-top: 20px;
-      box-shadow: 0 5px 15px rgba(108, 92, 231, 0.3);
+      transition: all 0.2s;
+    }
+    .check-card:hover {
+      background: rgba(255, 255, 255, 0.9);
+      transform: translateX(5px);
     }
 
-    .btn-grad:active { transform: scale(0.95); }
-    .btn-grad:hover { box-shadow: 0 8px 20px rgba(108, 92, 231, 0.4); }
+    /* 隐藏原生 checkbox */
+    .check-card input { display: none; }
 
-    /* === 5. 覆盖层 (滑动部分) === */
-    .overlay-container {
-      position: absolute;
-      top: 0;
-      left: 50%;
-      width: 50%;
-      height: 100%;
-      overflow: hidden;
-      transition: transform 0.6s ease-in-out;
-      z-index: 100;
+    /* 选中状态 */
+    .check-card.selected {
+      background: rgba(0, 184, 148, 0.1);
+      border-color: #00b894;
     }
-
-    .container-box.right-panel-active .overlay-container {
-      transform: translateX(-100%);
-    }
-
-    .overlay {
-      background: var(--primary-gradient);
-      background-repeat: no-repeat;
-      background-size: cover;
-      background-position: 0 0;
-      color: #ffffff;
-      position: relative;
-      left: -100%;
-      height: 100%;
-      width: 200%;
-      transform: translateX(0);
-      transition: transform 0.6s ease-in-out;
-    }
-
-    .container-box.right-panel-active .overlay {
-      transform: translateX(50%);
-    }
-
-    .overlay-panel {
-      position: absolute;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      flex-direction: column;
-      padding: 0 40px;
-      text-align: center;
-      top: 0;
-      height: 100%;
-      width: 50%;
-      transform: translateX(0);
-      transition: transform 0.6s ease-in-out;
-    }
-
-    .overlay-left {
-      transform: translateX(-20%);
-    }
-
-    .container-box.right-panel-active .overlay-left {
-      transform: translateX(0);
-    }
-
-    .overlay-right {
-      right: 0;
-      transform: translateX(0);
-    }
-
-    .container-box.right-panel-active .overlay-right {
-      transform: translateX(20%);
-    }
-
-    .btn-ghost {
-      background-color: transparent;
-      border-color: #ffffff;
-      border: 1px solid #fff;
+    .check-card.selected .check-icon {
+      background: #00b894;
       color: white;
-      border-radius: 50px;
-      padding: 12px 45px;
-      font-weight: bold;
-      letter-spacing: 1px;
-      text-transform: uppercase;
-      margin-top: 20px;
-      transition: 0.3s;
-    }
-    .btn-ghost:hover {
-      background: rgba(255,255,255,0.2);
+      border-color: #00b894;
     }
 
-    /* 响应式适配 */
-    @media (max-width: 768px) {
-      .container-box { min-height: 600px; width: 95%; }
-      .form-container { width: 100%; }
-      .overlay-container { display: none; } /* 移动端隐藏动画，改为简单切换逻辑 */
-      .sign-in-container { width: 100%; z-index: 5; }
-      .sign-up-container { width: 100%; display: none; }
-      .container-box.mobile-toggle .sign-in-container { display: none; }
-      .container-box.mobile-toggle .sign-up-container { display: flex; opacity: 1; z-index: 5; }
+    .check-icon {
+      width: 24px; height: 24px;
+      border-radius: 50%;
+      border: 2px solid #b2bec3;
+      margin-right: 15px;
+      display: flex; align-items: center; justify-content: center;
+      transition: all 0.2s;
+      color: transparent;
     }
+
+    /* === 4. 右侧：智能餐单纸 === */
+    .recipe-paper {
+      background: #fff;
+      border-radius: 20px;
+      padding: 40px;
+      height: 100%;
+      box-shadow: inset 0 0 40px rgba(0,0,0,0.02);
+      border: 1px solid rgba(0,0,0,0.05);
+      overflow-y: auto;
+      position: relative;
+    }
+
+    /* Markdown 样式优化 */
+    .recipe-content { line-height: 1.8; color: #2d3436; }
+    .recipe-content h1, .recipe-content h2, .recipe-content h3 { color: #00b894; margin-top: 20px; font-weight: 700; }
+    .recipe-content ul { padding-left: 20px; }
+    .recipe-content li { margin-bottom: 8px; }
+    .recipe-content strong { color: #2d3436; background: rgba(0, 184, 148, 0.1); padding: 0 4px; border-radius: 4px; }
+
+    /* === 5. 动画状态 === */
+    .empty-state {
+      text-align: center;
+      position: absolute; top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      color: #b2bec3;
+    }
+
+    .loading-container {
+      text-align: center;
+      position: absolute; top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+    }
+    .chef-hat {
+      font-size: 4rem;
+      color: #00b894;
+      animation: bounce 1s infinite alternate;
+    }
+    @keyframes bounce { from { transform: translateY(0); } to { transform: translateY(-20px); } }
+
+    /* 生成按钮 */
+    .btn-magic {
+      background: linear-gradient(135deg, #00b894, #55efc4);
+      border: none;
+      padding: 15px;
+      border-radius: 15px;
+      font-weight: 700;
+      color: white;
+      letter-spacing: 1px;
+      box-shadow: 0 8px 15px rgba(0, 184, 148, 0.3);
+      transition: all 0.3s;
+    }
+    .btn-magic:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 12px 20px rgba(0, 184, 148, 0.4);
+      color: white;
+    }
+
+    @keyframes fadeInUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
   </style>
 </head>
 <body>
@@ -289,171 +182,173 @@
   <div class="blob blob-2"></div>
 </div>
 
-<div class="container-box" id="container">
-  <div class="form-container sign-up-container">
-    <form onsubmit="doRegister(event)">
-      <h1>创建账户</h1>
-      <div class="social-container">
-        <a href="#" class="social"><i class="bi bi-wechat"></i></a>
-        <a href="#" class="social"><i class="bi bi-github"></i></a>
-      </div>
-      <span class="small text-muted mb-3">填写以下信息完成注册</span>
-
-      <div class="input-group-custom">
-        <input type="text" id="r_username" placeholder="用户名" required />
-        <i class="bi bi-person"></i>
-      </div>
-      <div class="input-group-custom">
-        <input type="email" id="r_email" placeholder="邮箱 (选填)" />
-        <i class="bi bi-envelope"></i>
-      </div>
-      <div class="input-group-custom">
-        <input type="password" id="r_password" placeholder="密码" required />
-        <i class="bi bi-lock"></i>
-      </div>
-
-      <button class="btn-grad">立即注册</button>
-      <button type="button" class="btn btn-link text-muted d-md-none mt-3" onclick="toggleMobile()">已有账号？去登录</button>
-    </form>
+<div class="main-container">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="fw-bold mb-0 text-dark"><i class="bi bi-stars text-success me-2"></i>AI 灵感配餐</h2>
+    <a href="/" class="btn btn-light rounded-pill px-4 shadow-sm fw-bold">
+      <i class="bi bi-house-door me-1"></i> 返回首页
+    </a>
   </div>
 
-  <div class="form-container sign-in-container">
-    <form onsubmit="doLogin(event)">
-      <h1 class="mb-2">欢迎回来</h1>
-      <p class="text-muted small mb-4">Fridge Guardian 冰箱守卫者</p>
+  <div class="row g-4" style="min-height: 650px;">
 
-      <div class="input-group-custom">
-        <input type="text" id="l_username" placeholder="用户名" required />
-        <i class="bi bi-person"></i>
-      </div>
-      <div class="input-group-custom">
-        <input type="password" id="l_password" placeholder="密码" required />
-        <i class="bi bi-lock"></i>
-      </div>
-      <div class="text-end w-100 mb-3">
-        <a href="#" class="text-muted small text-decoration-none">忘记密码?</a>
-      </div>
+    <div class="col-lg-4">
+      <div class="glass-panel">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h5 class="fw-bold mb-0">步骤 1: 勾选食材</h5>
+          <span class="badge bg-white text-secondary border">我的库存</span>
+        </div>
 
-      <button class="btn-grad">登录系统</button>
-      <button type="button" class="btn btn-link text-muted d-md-none mt-3" onclick="toggleMobile()">没有账号？去注册</button>
-    </form>
-  </div>
+        <div id="foodSelectionList" class="ingredient-list">
+          <div class="text-center py-4 text-muted small">
+            <div class="spinner-border spinner-border-sm text-secondary"></div> 正在读取冰箱...
+          </div>
+        </div>
 
-  <div class="overlay-container">
-    <div class="overlay">
-      <div class="overlay-panel overlay-left">
-        <h1 class="text-white">已有账号？</h1>
-        <p>请使用您的个人信息登录，继续管理您的食材库</p>
-        <button class="btn-ghost" id="signIn">去登录</button>
-      </div>
-      <div class="overlay-panel overlay-right">
-        <h1 class="text-white">新朋友？</h1>
-        <p>立即注册加入我们，开始智能管理您的冰箱生活</p>
-        <button class="btn-ghost" id="signUp">去注册</button>
+        <div class="mt-4 pt-3 border-top border-secondary-subtle">
+          <button class="btn btn-magic w-100" onclick="generateRecipe()">
+            <i class="bi bi-magic me-2"></i> 开始生成食谱
+          </button>
+        </div>
       </div>
     </div>
+
+    <div class="col-lg-8">
+      <div class="glass-panel p-0 overflow-hidden border-0">
+        <div class="recipe-paper" id="recipeBox">
+
+          <div id="idleState" class="empty-state">
+            <i class="bi bi-basket3 display-1 mb-3 d-block opacity-50"></i>
+            <h4>等待主厨下令...</h4>
+            <p class="small">请在左侧勾选您想要处理的食材，<br>AI 将为您量身定制美味食谱。</p>
+          </div>
+
+          <div id="loadingState" class="loading-container d-none">
+            <div class="chef-hat"><i class="bi bi-robot"></i></div>
+            <h4 class="mt-3 fw-bold text-success">AI 正在思考中...</h4>
+            <p class="text-muted">正在分析食材搭配与营养成分</p>
+            <div class="progress mt-3" style="width: 200px; height: 6px; margin: 0 auto;">
+              <div class="progress-bar progress-bar-striped progress-bar-animated bg-success" style="width: 100%"></div>
+            </div>
+          </div>
+
+          <div id="recipeResult" class="recipe-content d-none animate-enter">
+          </div>
+
+        </div>
+      </div>
+    </div>
+
   </div>
 </div>
 
 <script>
-  const API_BASE = "/api/auth";
-  const container = document.getElementById('container');
-  const signUpBtn = document.getElementById('signUp');
-  const signInBtn = document.getElementById('signIn');
+  // 1. Token 校验
+  const token = localStorage.getItem("fg_token");
+  if (!token) window.location.href = "/login";
 
-  // 切换动画逻辑
-  signUpBtn.addEventListener('click', () => {
-    container.classList.add("right-panel-active");
-  });
+  // 2. 加载食材列表 (带 Token)
+  fetch("/api/food/list", {
+    headers: { "Authorization": token }
+  })
+          .then((res) => {
+            if (res.status === 401) window.location.href = "/login";
+            return res.json();
+          })
+          .then((res) => {
+            const list = document.getElementById("foodSelectionList");
+            list.innerHTML = ""; // 清除 loading
 
-  signInBtn.addEventListener('click', () => {
-    container.classList.remove("right-panel-active");
-  });
+            if (!res.data || res.data.length === 0) {
+              list.innerHTML = `<div class="text-center text-muted py-5">冰箱空空如也<br><a href="/food/add-page" class="text-success">去买菜</a></div>`;
+              return;
+            }
 
-  // 移动端切换逻辑
-  function toggleMobile() {
-    if (window.innerWidth <= 768) {
-      container.classList.toggle("mobile-toggle");
-    } else {
-      container.classList.toggle("right-panel-active");
+            res.data.forEach((food) => {
+              // 创建胶囊卡片
+              const item = document.createElement("div");
+              item.className = "check-card";
+              item.innerHTML = `
+             <div class="check-icon"><i class="bi bi-check-lg"></i></div>
+             <div class="flex-grow-1">
+                 <div class="fw-bold text-dark">${food.name}</div>
+                 <small class="text-muted" style="font-size:0.75rem">
+                    ${food.daysLeft}天后过期 · ${food.quantity}${food.unit||''}
+                 </small>
+             </div>
+             <input type="checkbox" value="${food.id}">
+          `;
+
+              // 点击交互事件
+              item.onclick = (e) => {
+                // 阻止事件冒泡，防止点到 checkbox 自己触发两次
+                if (e.target.tagName === 'INPUT') return;
+
+                const checkbox = item.querySelector("input");
+                checkbox.checked = !checkbox.checked;
+
+                if (checkbox.checked) {
+                  item.classList.add("selected");
+                } else {
+                  item.classList.remove("selected");
+                }
+              };
+
+              list.appendChild(item);
+            });
+          });
+
+  // 3. 生成食谱逻辑
+  function generateRecipe() {
+    // 获取选中 ID
+    const ids = Array.from(document.querySelectorAll("input:checked")).map(i => i.value);
+
+    if (ids.length === 0) {
+      // 简单的抖动提醒
+      const btn = document.querySelector('.btn-magic');
+      btn.classList.add('bg-danger');
+      btn.innerText = "请至少选一个食材！";
+      setTimeout(() => {
+        btn.classList.remove('bg-danger');
+        btn.innerHTML = '<i class="bi bi-magic me-2"></i> 开始生成食谱';
+      }, 1500);
+      return;
     }
-  }
 
-  // 登录逻辑
-  async function doLogin(e) {
-    e.preventDefault();
-    // 加载状态反馈
-    const btn = e.target.querySelector('button[type="submit"]');
-    const originalText = btn.innerText;
-    btn.innerText = "登录中...";
-    btn.disabled = true;
+    // 切换 UI 状态
+    document.getElementById("idleState").classList.add("d-none");
+    document.getElementById("recipeResult").classList.add("d-none");
+    document.getElementById("loadingState").classList.remove("d-none");
 
-    const username = document.getElementById("l_username").value;
-    const password = document.getElementById("l_password").value;
+    // 发送请求 (带 Token)
+    fetch("/api/ai/generate-recipe", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": token
+      },
+      body: JSON.stringify(ids),
+    })
+            .then((res) => res.json())
+            .then((res) => {
+              // 隐藏 Loading
+              document.getElementById("loadingState").classList.add("d-none");
 
-    try {
-      const res = await fetch(`${API_BASE}/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password })
-      });
-      const result = await res.json();
-      if (result.code === 200) {
-        localStorage.setItem("fg_token", result.data.token);
-        localStorage.setItem("fg_user", result.data.username);
-        btn.innerText = "登录成功!";
-        setTimeout(() => window.location.href = "/", 500);
-      } else {
-        alert(result.message);
-        resetBtn();
-      }
-    } catch (err) {
-      alert("网络错误");
-      resetBtn();
-    }
-
-    function resetBtn() {
-      btn.innerText = originalText;
-      btn.disabled = false;
-    }
-  }
-
-  // 注册逻辑
-  async function doRegister(e) {
-    e.preventDefault();
-    const btn = e.target.querySelector('button[type="submit"]');
-    const originalText = btn.innerText;
-    btn.innerText = "注册中...";
-    btn.disabled = true;
-
-    const username = document.getElementById("r_username").value;
-    const password = document.getElementById("r_password").value;
-    const email = document.getElementById("r_email").value;
-
-    try {
-      const res = await fetch(`${API_BASE}/register`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password, email })
-      });
-      const result = await res.json();
-      if (result.code === 200) {
-        alert("注册成功，请登录");
-        // 自动切换回登录页
-        if (window.innerWidth <= 768) {
-          container.classList.remove("mobile-toggle");
-        } else {
-          container.classList.remove("right-panel-active");
-        }
-        // 清空输入框
-        e.target.reset();
-      } else {
-        alert(result.message);
-      }
-    } catch (err) { alert("网络错误"); }
-
-    btn.innerText = originalText;
-    btn.disabled = false;
+              if (res.code === 200) {
+                const resultBox = document.getElementById("recipeResult");
+                resultBox.classList.remove("d-none");
+                // 渲染 Markdown
+                resultBox.innerHTML = marked.parse(res.data.content);
+              } else {
+                alert("生成失败：" + res.message);
+                document.getElementById("idleState").classList.remove("d-none");
+              }
+            })
+            .catch(err => {
+              alert("网络错误，请稍后再试");
+              document.getElementById("loadingState").classList.add("d-none");
+              document.getElementById("idleState").classList.remove("d-none");
+            });
   }
 </script>
 </body>
