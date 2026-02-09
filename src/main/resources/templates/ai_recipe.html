@@ -1,102 +1,109 @@
-<!doctype html>
-<html>
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>AI 灵感配餐 - 冰箱守卫者</title>
-    <link
-      href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&display=swap"
-      rel="stylesheet"
-    />
-    <link
-      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
-      rel="stylesheet"
-    />
-    <link
-      href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css"
-      rel="stylesheet"
-    />
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    <link href="/css/ai_recipe.css" rel="stylesheet" />
-  </head>
-  <body>
-    <div class="background-blobs">
-      <div class="blob blob-1"></div>
-      <div class="blob blob-2"></div>
-    </div>
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI 智能厨师 - 冰箱守卫者</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="/css/index.css" rel="stylesheet"> <link href="/css/ai_recipe.css" rel="stylesheet"> </head>
+<body>
 
-    <div class="main-container">
-      <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2 class="fw-bold mb-0 text-dark">
-          <i class="bi bi-stars text-success me-2"></i>AI 灵感配餐
-        </h2>
-        <a href="/" class="btn btn-light rounded-pill px-4 shadow-sm fw-bold">
-          <i class="bi bi-house-door me-1"></i> 返回首页
-        </a>
-      </div>
+<nav class="navbar navbar-expand-lg navbar-dark bg-transparent position-absolute w-100" style="z-index: 10;">
+  <div class="container">
+    <a class="navbar-brand fw-bold" href="/"><i class="bi bi-snow2 me-2"></i>冰箱守卫者</a>
+  </div>
+</nav>
 
-      <div class="row g-4" style="min-height: 650px">
-        <div class="col-lg-4">
-          <div class="glass-panel">
-            <div class="d-flex justify-content-between align-items-center mb-3">
-              <h5 class="fw-bold mb-0">步骤 1: 勾选食材</h5>
-              <span class="badge bg-white text-secondary border">我的库存</span>
-            </div>
+<div class="background-blobs">
+  <div class="blob blob-1"></div>
+  <div class="blob blob-2"></div>
+</div>
 
-            <div id="foodSelectionList" class="ingredient-list">
-              <div class="text-center py-4 text-muted small">
-                <div
-                  class="spinner-border spinner-border-sm text-secondary"
-                ></div>
-                正在读取冰箱...
-              </div>
-            </div>
+<div class="container" style="padding-top: 80px; padding-bottom: 40px;">
+  <div class="row g-4 h-100">
 
-            <div class="mt-4 pt-3 border-top border-secondary-subtle">
-              <button class="btn btn-magic w-100" onclick="generateRecipe()">
-                <i class="bi bi-magic me-2"></i> 开始生成食谱
-              </button>
-            </div>
+    <div class="col-lg-4 d-flex flex-column">
+      <div class="glass-card p-4 flex-grow-1 d-flex flex-column">
+        <h5 class="mb-3 fw-bold text-dark"><i class="bi bi-basket2-fill text-primary me-2"></i>第一步：选择食材</h5>
+        <p class="text-muted small mb-4">勾选您想处理的食材，AI 将为您量身定制。</p>
+
+        <div class="food-selector-wrapper flex-grow-1 overflow-auto pe-2 custom-scrollbar">
+          <div th:if="${#lists.isEmpty(foods)}" class="text-center text-muted py-5">
+            <i class="bi bi-box-seam display-4 opacity-25"></i>
+            <p class="mt-2">冰箱空空如也，快去<a href="/food/add-page">录入食材</a>吧！</p>
+          </div>
+
+          <div class="form-check custom-check mb-2" th:each="food : ${foods}">
+            <input class="form-check-input" type="checkbox" name="foodIds" th:value="${food.id}" th:id="'food-'+${food.id}">
+            <label class="form-check-label w-100" th:for="'food-'+${food.id}">
+              <span class="fw-medium" th:text="${food.name}">食材名</span>
+              <small class="text-muted float-end" th:text="${food.quantity} + ${food.unit}">数量</small>
+            </label>
           </div>
         </div>
 
-        <div class="col-lg-8">
-          <div class="glass-panel p-0 overflow-hidden border-0">
-            <div class="recipe-paper" id="recipeBox">
-              <div id="idleState" class="empty-state">
-                <i class="bi bi-basket3 display-1 mb-3 d-block opacity-50"></i>
-                <h4>等待主厨下令...</h4>
-                <p class="small">
-                  请在左侧勾选您想要处理的食材，<br />AI
-                  将为您量身定制美味食谱。
-                </p>
-              </div>
-
-              <div id="loadingState" class="loading-container d-none">
-                <div class="chef-hat"><i class="bi bi-robot"></i></div>
-                <h4 class="mt-3 fw-bold text-success">AI 正在思考中...</h4>
-                <p class="text-muted">正在分析食材搭配与营养成分</p>
-                <div
-                  class="progress mt-3"
-                  style="width: 200px; height: 6px; margin: 0 auto"
-                >
-                  <div
-                    class="progress-bar progress-bar-striped progress-bar-animated bg-success"
-                    style="width: 100%"
-                  ></div>
-                </div>
-              </div>
-
-              <div
-                id="recipeResult"
-                class="recipe-content d-none animate-enter"
-              ></div>
-            </div>
-          </div>
-        </div>
+        <button onclick="generateRecipe()" class="btn btn-primary w-100 mt-3 py-3 btn-glow rounded-pill fw-bold" id="btn-generate">
+          <i class="bi bi-stars me-2"></i>立即生成菜谱
+        </button>
       </div>
     </div>
 
-    <script src="/js/ai_recipe.js"></script>
-  </body>
+    <div class="col-lg-8 d-flex flex-column" style="height: 75vh;">
+      <div class="glass-card p-0 h-100 d-flex flex-column position-relative overflow-hidden">
+
+        <div class="chat-header p-3 border-bottom bg-white bg-opacity-50 backdrop-blur d-flex justify-content-between align-items-center">
+          <div class="d-flex align-items-center">
+            <div class="avatar-circle me-3 bg-gradient-primary">
+              <i class="bi bi-robot text-white"></i>
+            </div>
+            <div>
+              <h6 class="mb-0 fw-bold text-dark">AI 智能厨师</h6>
+              <small class="text-muted status-text">等待指令...</small>
+            </div>
+          </div>
+          <span class="badge bg-light text-secondary border rounded-pill d-none" id="turn-badge">
+                        对话: <span id="turn-count">0</span>/5
+                    </span>
+        </div>
+
+        <div id="chat-container" class="chat-content flex-grow-1 p-4 overflow-auto custom-scrollbar position-relative">
+          <div id="ai-empty-state" class="position-absolute top-50 start-50 translate-middle text-center text-muted w-100">
+            <img src="https://cdn-icons-png.flaticon.com/512/2083/2083256.png" width="80" class="mb-3 opacity-50" alt="Chef">
+            <p class="mb-0">在左侧选择食材，点击生成<br>我将为您推荐美味食谱</p>
+          </div>
+        </div>
+
+        <div id="input-area" class="chat-footer p-3 bg-white border-top d-none">
+          <div class="position-relative">
+            <input type="text" id="taste-input" class="form-control form-control-lg rounded-pill ps-4 pe-5 bg-light border-0"
+                   placeholder="口味微调？例如：我不吃辣、加点醋..." autocomplete="off">
+
+            <button id="btn-new-chat" class="btn btn-sm btn-link text-decoration-none text-muted position-absolute top-50 end-0 translate-middle-y me-5"
+                    onclick="resetConversation()" style="font-size: 0.85rem;">
+              <i class="bi bi-arrow-clockwise me-1"></i>新对话
+            </button>
+
+            <button id="btn-send" onclick="sendFollowUp()" class="btn btn-primary rounded-circle position-absolute top-50 end-0 translate-middle-y me-2 shadow-sm"
+                    style="width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;">
+              <i class="bi bi-send-fill" style="font-size: 1rem; margin-left: 2px;"></i>
+            </button>
+          </div>
+        </div>
+
+        <div id="loading-overlay" class="position-absolute top-0 start-0 w-100 h-100 bg-white bg-opacity-90 d-none flex-column align-items-center justify-content-center z-3">
+          <div class="spinner-grow text-primary mb-3" role="status" style="width: 3rem; height: 3rem;"></div>
+          <h6 class="text-primary fw-bold typing-effect">AI 正在根据您的食材构思食谱...</h6>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script src="/js/ai_recipe.js"></script>
+
+</body>
 </html>
