@@ -6,7 +6,9 @@
   <title>AI 智能厨师 - 冰箱守卫者</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
-  <link href="/css/index.css" rel="stylesheet"> <link href="/css/ai_recipe.css" rel="stylesheet"> </head>
+  <link href="/css/index.css" rel="stylesheet">
+  <link href="/css/ai_recipe.css" rel="stylesheet">
+</head>
 <body>
 
 <nav class="navbar navbar-expand-lg navbar-dark bg-transparent position-absolute w-100" style="z-index: 10;">
@@ -66,11 +68,12 @@
                     </span>
         </div>
 
+        <div id="ai-empty-state" class="position-absolute top-50 start-50 translate-middle text-center text-muted w-100" style="z-index: 5; pointer-events: none;">
+          <img src="https://cdn-icons-png.flaticon.com/512/2083/2083256.png" width="80" class="mb-3 opacity-50" alt="Chef">
+          <p class="mb-0">在左侧选择食材，点击生成<br>我将为您推荐美味食谱</p>
+        </div>
+
         <div id="chat-container" class="chat-content flex-grow-1 p-4 overflow-auto custom-scrollbar position-relative">
-          <div id="ai-empty-state" class="position-absolute top-50 start-50 translate-middle text-center text-muted w-100">
-            <img src="https://cdn-icons-png.flaticon.com/512/2083/2083256.png" width="80" class="mb-3 opacity-50" alt="Chef">
-            <p class="mb-0">在左侧选择食材，点击生成<br>我将为您推荐美味食谱</p>
-          </div>
         </div>
 
         <div id="input-area" class="chat-footer p-3 bg-white border-top d-none">
@@ -96,6 +99,18 @@
         </div>
 
       </div>
+    </div>
+  </div>
+</div>
+
+<div id="reset-confirm-modal" class="custom-modal-overlay">
+  <div class="custom-modal">
+    <div class="modal-icon"><i class="bi bi-question-lg"></i></div>
+    <h4 class="fw-bold mb-2">确认新对话？</h4>
+    <p class="text-muted small">确定要放弃当前菜谱并开始新对话吗？<br>此操作将清空当前的对话记录。</p>
+    <div class="modal-btns">
+      <button class="btn-modal btn-modal-cancel" onclick="closeResetModal()">取消</button>
+      <button class="btn-modal btn-modal-confirm" onclick="confirmReset()">确定</button>
     </div>
   </div>
 </div>

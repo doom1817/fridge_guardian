@@ -95,9 +95,11 @@ async function generateRecipe() {
 
   // UI 状态更新
   setLoading(true, "AI 正在分析食材并设计食谱...");
-  document.getElementById('ai-empty-state').classList.add('d-none');
-  document.getElementById('chat-container').innerHTML = '';
+// 安全地操作 DOM
+  const emptyState = document.getElementById('ai-empty-state');
+  if(emptyState) emptyState.classList.add('d-none'); // 隐藏空状态
 
+  document.getElementById('chat-container').innerHTML = ''; // 清空聊天记录
   turnCount = 0;
   updateStatusText("正在生成...");
 
@@ -112,18 +114,20 @@ async function generateRecipe() {
       document.getElementById('input-area').classList.remove('d-none');
       document.getElementById('turn-badge').classList.remove('d-none');
       updateTurnUI();
-
       setTimeout(() => document.getElementById('taste-input').focus(), 500);
       updateStatusText("待命：您可以调整口味");
     } else {
       alert(res.message || "生成失败");
-      document.getElementById('ai-empty-state').classList.remove('d-none');
+      // 失败回退：显示空状态
+      if(emptyState) emptyState.classList.remove('d-none');
     }
   } catch (e) {
     console.error(e);
     alert("网络连接错误");
+    // 失败回退
+    if(emptyState) emptyState.classList.remove('d-none');
   } finally {
-    setLoading(false);
+    setLoading(false); // 无论成功失败，都停止转圈
   }
 }
 
@@ -163,27 +167,48 @@ async function sendFollowUp() {
   }
 }
 
-// === 第三步：新对话 (清空) ===
-async function resetConversation() {
-  if (!confirm("确定要放弃当前菜谱并开始新对话吗？")) return;
+// === 第三步：新对话 (触发弹窗) ===
+function resetConversation() {
+  // 不再直接 confirm，而是显示自定义 Modal
+  const modal = document.getElementById('reset-confirm-modal');
+  modal.style.display = 'flex';
+}
+// === 关闭弹窗 ===
+function closeResetModal() {
+  const modal = document.getElementById('reset-confirm-modal');
+  modal.style.display = 'none';
+}
+// === 确认重置 (实际执行逻辑) ===
+async function confirmReset() {
+  closeResetModal(); // 关闭弹窗
 
   try {
-    await fetchWithAuth("/api/ai/clear-history", { method: "POST" });
+    // 调用后端清空记忆
+    await fetchWithAuth("/api/ai/clear-history", {method: "POST"});
 
+    // 前端重置 UI
     const container = document.getElementById('chat-container');
     container.innerHTML = '';
-    document.getElementById('ai-empty-state').classList.remove('d-none');
+
+    // 显示空状态图
+    const emptyState = document.getElementById('ai-empty-state');
+    if (emptyState) emptyState.classList.remove('d-none');
+
+    // 隐藏底部输入栏和计数器
     document.getElementById('input-area').classList.add('d-none');
     document.getElementById('turn-badge').classList.add('d-none');
 
+    // 重置变量
     turnCount = 0;
     updateTurnUI();
     updateStatusText("等待指令...");
 
+    // 取消所有勾选的食材
     document.querySelectorAll('input[name="foodIds"]').forEach(cb => cb.checked = false);
 
   } catch (e) {
-    alert("重置失败");
+    console.error(e);
+    alert("重置失败，请检查网络");
   }
 }
 
