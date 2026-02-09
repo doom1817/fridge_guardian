@@ -1,6 +1,5 @@
 package com.doom.fg.controller;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.doom.fg.common.Result;
 import com.doom.fg.context.UserContext;
 import com.doom.fg.entity.AiApiLog;
@@ -34,23 +33,17 @@ public class AiApiController {
     public Result<Map<String, Object>> getStatistics() {
         Long userId = UserContext.getUserId();
 
-        LambdaQueryWrapper<AiApiLog> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(AiApiLog::getUserId, userId);
+        Map<String, Object> dbResult = aiApiLogMapper.getStatisticsByUserId(userId);
 
-        List<AiApiLog> logs = aiApiLogMapper.selectList(wrapper);
+        long totalCalls = dbResult != null && dbResult.get("totalCalls") != null ? ((Number) dbResult.get("totalCalls")).longValue() : 0;
+        long successCalls = dbResult != null && dbResult.get("successCalls") != null ? ((Number) dbResult.get("successCalls")).longValue() : 0;
+        long failedCalls = dbResult != null && dbResult.get("failedCalls") != null ? ((Number) dbResult.get("failedCalls")).longValue() : 0;
+        int totalTokens = dbResult != null && dbResult.get("totalTokens") != null ? ((Number) dbResult.get("totalTokens")).intValue() : 0;
+        int promptTokens = dbResult != null && dbResult.get("promptTokens") != null ? ((Number) dbResult.get("promptTokens")).intValue() : 0;
+        int completionTokens = dbResult != null && dbResult.get("completionTokens") != null ? ((Number) dbResult.get("completionTokens")).intValue() : 0;
+        long avgLatency = dbResult != null && dbResult.get("avgLatency") != null ? ((Number) dbResult.get("avgLatency")).longValue() : 0;
 
-        long totalCalls = logs.size();
-        long successCalls = logs.stream().filter(log -> log.getIsSuccess() == 1).count();
-        long failedCalls = totalCalls - successCalls;
         double successRate = totalCalls > 0 ? (successCalls * 100.0 / totalCalls) : 0;
-
-        int totalTokens = logs.stream().mapToInt(AiApiLog::getTotalTokens).sum();
-        int promptTokens = logs.stream().mapToInt(AiApiLog::getPromptTokens).sum();
-        int completionTokens = logs.stream().mapToInt(AiApiLog::getCompletionTokens).sum();
-
-        long avgLatency = logs.stream().filter(log -> log.getLatencyMs() != null)
-                .mapToLong(AiApiLog::getLatencyMs).sum();
-        avgLatency = totalCalls > 0 ? avgLatency / totalCalls : 0;
 
         Map<String, Object> stats = new HashMap<>();
         stats.put("totalCalls", totalCalls);
@@ -72,13 +65,11 @@ public class AiApiController {
         LocalDate endDate = LocalDate.now();
         LocalDate startDate = endDate.minusDays(days - 1);
 
-        LambdaQueryWrapper<AiApiLog> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(AiApiLog::getUserId, userId)
-                .ge(AiApiLog::getCreateTime, startDate.atStartOfDay())
-                .le(AiApiLog::getCreateTime, endDate.plusDays(1).atStartOfDay())
-                .orderByAsc(AiApiLog::getCreateTime);
-
-        List<AiApiLog> logs = aiApiLogMapper.selectList(wrapper);
+        List<Map<String, Object>> dbResults = aiApiLogMapper.getTokenTrendByUserId(
+                userId, 
+                startDate.atStartOfDay(), 
+                endDate.plusDays(1).atStartOfDay()
+        );
 
         Map<String, Map<String, Object>> dailyData = new LinkedHashMap<>();
         for (int i = 0; i < days; i++) {
@@ -92,14 +83,14 @@ public class AiApiController {
             dailyData.put(date.format(DateTimeFormatter.ofPattern("yyyy-MM-dd")), data);
         }
 
-        for (AiApiLog log : logs) {
-            String dateKey = log.getCreateTime().toLocalDate().format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+        for (Map<String, Object> dbResult : dbResults) {
+            String dateKey = ((java.sql.Date) dbResult.get("date")).toLocalDate().format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
             Map<String, Object> data = dailyData.get(dateKey);
             if (data != null) {
-                data.put("totalTokens", (Integer) data.get("totalTokens") + log.getTotalTokens());
-                data.put("promptTokens", (Integer) data.get("promptTokens") + log.getPromptTokens());
-                data.put("completionTokens", (Integer) data.get("completionTokens") + log.getCompletionTokens());
-                data.put("callCount", (Integer) data.get("callCount") + 1);
+                data.put("totalTokens", dbResult.get("totalTokens") != null ? ((Number) dbResult.get("totalTokens")).intValue() : 0);
+                data.put("promptTokens", dbResult.get("promptTokens") != null ? ((Number) dbResult.get("promptTokens")).intValue() : 0);
+                data.put("completionTokens", dbResult.get("completionTokens") != null ? ((Number) dbResult.get("completionTokens")).intValue() : 0);
+                data.put("callCount", dbResult.get("callCount") != null ? ((Number) dbResult.get("callCount")).intValue() : 0);
             }
         }
 
@@ -114,13 +105,11 @@ public class AiApiController {
         LocalDate endDate = LocalDate.now();
         LocalDate startDate = endDate.minusDays(days - 1);
 
-        LambdaQueryWrapper<AiApiLog> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(AiApiLog::getUserId, userId)
-                .ge(AiApiLog::getCreateTime, startDate.atStartOfDay())
-                .le(AiApiLog::getCreateTime, endDate.plusDays(1).atStartOfDay())
-                .orderByAsc(AiApiLog::getCreateTime);
-
-        List<AiApiLog> logs = aiApiLogMapper.selectList(wrapper);
+        List<Map<String, Object>> dbResults = aiApiLogMapper.getSuccessRateTrendByUserId(
+                userId, 
+                startDate.atStartOfDay(), 
+                endDate.plusDays(1).atStartOfDay()
+        );
 
         Map<String, Map<String, Object>> dailyData = new LinkedHashMap<>();
         for (int i = 0; i < days; i++) {
@@ -134,19 +123,17 @@ public class AiApiController {
             dailyData.put(date.format(DateTimeFormatter.ofPattern("yyyy-MM-dd")), data);
         }
 
-        for (AiApiLog log : logs) {
-            String dateKey = log.getCreateTime().toLocalDate().format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+        for (Map<String, Object> dbResult : dbResults) {
+            String dateKey = ((java.sql.Date) dbResult.get("date")).toLocalDate().format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
             Map<String, Object> data = dailyData.get(dateKey);
             if (data != null) {
-                data.put("totalCalls", (Integer) data.get("totalCalls") + 1);
-                if (log.getIsSuccess() == 1) {
-                    data.put("successCalls", (Integer) data.get("successCalls") + 1);
-                } else {
-                    data.put("failedCalls", (Integer) data.get("failedCalls") + 1);
-                }
-                int total = (Integer) data.get("totalCalls");
-                int success = (Integer) data.get("successCalls");
-                data.put("successRate", total > 0 ? Math.round(success * 10000.0 / total) / 100.0 : 0.0);
+                int totalCalls = dbResult.get("totalCalls") != null ? ((Number) dbResult.get("totalCalls")).intValue() : 0;
+                int successCalls = dbResult.get("successCalls") != null ? ((Number) dbResult.get("successCalls")).intValue() : 0;
+                int failedCalls = dbResult.get("failedCalls") != null ? ((Number) dbResult.get("failedCalls")).intValue() : 0;
+                data.put("totalCalls", totalCalls);
+                data.put("successCalls", successCalls);
+                data.put("failedCalls", failedCalls);
+                data.put("successRate", totalCalls > 0 ? Math.round(successCalls * 10000.0 / totalCalls) / 100.0 : 0.0);
             }
         }
 
