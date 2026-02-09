@@ -5,4 +5,8 @@ import java.util.Map;
 
 public interface AiService {
     Map<String, String> getAiRecipe(List<Long> foodIds);
+
+    String chatWithHistory(String message);
+
+    void clearHistory();
 }

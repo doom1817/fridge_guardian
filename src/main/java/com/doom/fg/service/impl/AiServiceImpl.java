@@ -10,12 +10,18 @@ import com.doom.fg.mapper.AiApiLogMapper;
 import com.doom.fg.service.AiService;
 import com.doom.fg.service.FoodItemService;
 import com.doom.fg.service.RecipeRecordService;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 import okhttp3.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
+import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -34,16 +40,29 @@ public class AiServiceImpl implements AiService {
     @Autowired
     private AiApiLogMapper aiApiLogMapper;
 
+    @Autowired
+    private StringRedisTemplate redisTemplate;
+
     @Value("${ai.api-key}")
     private String apiKey;
 
     @Value("${ai.api-url}")
     private String apiUrl;
 
+    @Value("${ai.model}")
+    private String modelName;
+
     private final OkHttpClient client = new OkHttpClient.Builder()
             .connectTimeout(60, TimeUnit.SECONDS)
             .readTimeout(60, TimeUnit.SECONDS)
             .build();
+
+    // Redis Key 前缀
+    private static final String HISTORY_KEY_PREFIX = "ai:chat:history:";
+    // 保留最近几轮对话 (1轮 = 1问 + 1答，10条即保留5轮)
+    private static final int MAX_HISTORY_SIZE = 10;
+    // 上下文过期时间 (例如 30 分钟无对话则清空)
+    private static final long HISTORY_EXPIRE_MINUTES = 30;
 
     @Override
     public Map<String, String> getAiRecipe(List<Long> foodIds) {
@@ -161,5 +180,150 @@ public class AiServiceImpl implements AiService {
             e.printStackTrace();
             return "网络错误：" + e.getMessage();
         }
+    }
+
+    /**
+     * 清空对话历史
+     */
+    public void clearHistory() {
+        Long userId = UserContext.getUserId();
+        if (userId == null) {
+            throw new RuntimeException("用户未登录");
+        }
+        String redisKey = HISTORY_KEY_PREFIX + userId;
+        redisTemplate.delete(redisKey);
+    }
+
+    /**
+     * 支持上下文的通用对话接口
+     */
+    public String chatWithHistory(String userMessage) {
+        Long userId = UserContext.getUserId();
+        String redisKey = HISTORY_KEY_PREFIX + userId;
+
+        // 1. 准备 System Prompt (系统人设)
+        // 注意：System Prompt 通常不存入 Redis，而是每次请求时放在第一条
+        AiMessage systemMsg = new AiMessage("system", "你是一个专业的冰箱食材管理助手，请帮助用户规划菜谱和管理库存。");
+
+        // 2. 从 Redis 获取历史记录
+        List<AiMessage> history = getHistoryFromRedis(redisKey);
+
+        // 3. 构建本次请求的消息列表 (System + History + Current User Msg)
+        List<AiMessage> requestMessages = new ArrayList<>();
+        requestMessages.add(systemMsg);
+        requestMessages.addAll(history);
+        requestMessages.add(new AiMessage("user", userMessage));
+
+        // 4. 发送请求给 DeepSeek
+        String aiReply = callDeepSeekApi(requestMessages);
+
+        // 5. 如果调用成功，将本次对话存入 Redis (异步或同步均可)
+        if (aiReply != null && !aiReply.startsWith("Error")) {
+            saveToRedis(redisKey, new AiMessage("user", userMessage));
+            saveToRedis(redisKey, new AiMessage("assistant", aiReply));
+        }
+
+        return aiReply;
+    }
+    /**
+     * 存储消息到 Redis
+     */
+    private List<AiMessage> getHistoryFromRedis(String key) {
+        // 从 Redis List 获取所有数据
+        List<String> jsonList = redisTemplate.opsForList().range(key, 0, -1);
+        if (jsonList == null || jsonList.isEmpty()) {
+            return new ArrayList<>();
+        }
+        return jsonList.stream()
+                .map(json -> JSON.parseObject(json, AiMessage.class))
+                .collect(Collectors.toList());
+    }
+    private void saveToRedis(String key, AiMessage message) {
+        // 1. 推入新消息
+        redisTemplate.opsForList().rightPush(key, JSON.toJSONString(message));
+
+        // 2. 裁剪长度 (保持最新的 N 条)
+        // 如果当前长度 > MAX，移除头部旧数据
+        Long size = redisTemplate.opsForList().size(key);
+        if (size != null && size > MAX_HISTORY_SIZE) {
+            redisTemplate.opsForList().trim(key, size - MAX_HISTORY_SIZE, -1);
+        }
+
+        // 3. 刷新过期时间
+        redisTemplate.expire(key, HISTORY_EXPIRE_MINUTES, TimeUnit.MINUTES);
+    }
+    private String callDeepSeekApi(List<AiMessage> messages) {
+        // 记录日志准备
+        AiApiLog logEntity = new AiApiLog();
+        logEntity.setUserId(UserContext.getUserId());
+        logEntity.setModel(modelName);
+        logEntity.setRequestType("CHAT");
+        long start = System.currentTimeMillis();
+
+        try {
+            // 构建 JSON Body
+            JSONObject jsonBody = new JSONObject();
+            jsonBody.put("model", modelName);
+            jsonBody.put("messages", messages); // 直接放入对象数组
+            jsonBody.put("stream", false);
+
+            RequestBody body = RequestBody.create(
+                    MediaType.parse("application/json"), jsonBody.toJSONString());
+
+            Request request = new Request.Builder()
+                    .url(apiUrl)
+                    .header("Authorization", "Bearer " + apiKey)
+                    .post(body)
+                    .build();
+
+            try (Response response = client.newCall(request).execute()) {
+                long end = System.currentTimeMillis();
+                logEntity.setLatencyMs(end - start);
+                logEntity.setStatusCode(response.code());
+
+                String resStr = response.body() != null ? response.body().string() : "";
+
+                if (response.isSuccessful()) {
+                    JSONObject resObj = JSON.parseObject(resStr);
+
+                    // 记录 Token 消耗 (您之前的逻辑)
+                    if (resObj.containsKey("usage")) {
+                        JSONObject usage = resObj.getJSONObject("usage");
+                        logEntity.setPromptTokens(usage.getIntValue("prompt_tokens"));
+                        logEntity.setCompletionTokens(usage.getIntValue("completion_tokens"));
+                        logEntity.setTotalTokens(usage.getIntValue("total_tokens"));
+                    }
+                    logEntity.setIsSuccess(1);
+                    aiApiLogMapper.insert(logEntity);
+
+                    // 返回 AI 的回答内容
+                    return resObj.getJSONArray("choices")
+                            .getJSONObject(0)
+                            .getJSONObject("message")
+                            .getString("content");
+                } else {
+                    logEntity.setIsSuccess(0);
+                    logEntity.setErrorMsg("HTTP " + response.code());
+                    aiApiLogMapper.insert(logEntity);
+                    return "Error: API call failed with code " + response.code();
+                }
+            }
+        } catch (Exception e) {
+            logEntity.setLatencyMs(System.currentTimeMillis() - start);
+            logEntity.setIsSuccess(0);
+            logEntity.setErrorMsg(e.getMessage());
+            aiApiLogMapper.insert(logEntity);
+            e.printStackTrace();
+            return "Error: " + e.getMessage();
+        }
+    }
+
+    // 内部 DTO 类
+    @Data
+    @AllArgsConstructor
+    @NoArgsConstructor
+    public static class AiMessage implements Serializable {
+        private String role;  // "user"
+        private String content;
     }
 }

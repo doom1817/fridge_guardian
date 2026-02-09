@@ -174,6 +174,24 @@ public class AiApiController {
         return Result.success(new ArrayList<>(dailyData.values()));
     }
 
+
+    @PostMapping("/chat")
+    public Result<String> chat(@RequestBody Map<String, String> params) {
+        String message = params.get("message");
+        if (message == null || message.trim().isEmpty()) {
+            return Result.error("请输入内容");
+        }
+        String reply = aiService.chatWithHistory(message);
+        return Result.success(reply);
+    }
+
+    @PostMapping("/clear-history")
+    public Result<String> clearHistory() {
+        aiService.clearHistory();
+        return Result.success("记忆已清除");
+    }
+
+
     // --- 辅助方法：安全转换数字类型 (放在 Controller 底部) ---
     private int toInt(Object obj) {
         return obj == null ? 0 : ((Number) obj).intValue();

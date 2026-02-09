@@ -21,9 +21,11 @@ import java.io.IOException;
  */
 public class JwtFilter extends BasicHttpAuthenticationFilter {
 
-    @Autowired
-    private JwtUtil jwtUtil;
+    private final JwtUtil jwtUtil;
 
+    public JwtFilter(JwtUtil jwtUtil) {
+        this.jwtUtil = jwtUtil;
+    }
     /**
      * 核心修复点：重写 onAccessDenied
      * 当 isAccessAllowed 返回 false 时（即没有 Token 或认证失败），

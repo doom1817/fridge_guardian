@@ -1,6 +1,7 @@
 package com.doom.fg.config;
 import com.doom.fg.security.JwtFilter;
 import com.doom.fg.security.UserRealm;
+import com.doom.fg.util.JwtUtil;
 import org.apache.shiro.mgt.DefaultSessionStorageEvaluator;
 import org.apache.shiro.mgt.DefaultSubjectDAO;
 import org.apache.shiro.spring.web.ShiroFilterFactoryBean;
@@ -39,13 +40,13 @@ public class ShiroConfig {
 
     // 配置过滤器工厂
     @Bean
-    public ShiroFilterFactoryBean shiroFilterFactoryBean(DefaultWebSecurityManager securityManager) {
+    public ShiroFilterFactoryBean shiroFilterFactoryBean(DefaultWebSecurityManager securityManager, JwtUtil jwtUtil) {
         ShiroFilterFactoryBean factoryBean = new ShiroFilterFactoryBean();
         factoryBean.setSecurityManager(securityManager);
 
         // 1. 添加我们自定义的 JWT 过滤器，命名为 "jwt"
         Map<String, Filter> filterMap = new HashMap<>();
-        filterMap.put("jwt", new JwtFilter());
+        filterMap.put("jwt", new JwtFilter(jwtUtil));
         factoryBean.setFilters(filterMap);
 
         // 2. 配置拦截规则（注意顺序：LinkedHashMap）
