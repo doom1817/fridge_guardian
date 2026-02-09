@@ -28,20 +28,19 @@
         <h5 class="mb-3 fw-bold text-dark"><i class="bi bi-basket2-fill text-primary me-2"></i>第一步：选择食材</h5>
         <p class="text-muted small mb-4">勾选您想处理的食材，AI 将为您量身定制。</p>
 
-        <div class="food-selector-wrapper flex-grow-1 overflow-auto pe-2 custom-scrollbar">
-          <div th:if="${#lists.isEmpty(foods)}" class="text-center text-muted py-5">
+        <div class="food-selector-wrapper flex-grow-1 overflow-auto pe-2 custom-scrollbar" id="food-list-container">
+          <div class="text-center text-muted py-5">
+            <div class="spinner-border spinner-border-sm text-primary mb-2" role="status"></div>
+            <p class="small">正在加载您的冰箱库存...</p>
+          </div>
+        </div>
+
+        <template id="tpl-empty-state">
+          <div class="text-center text-muted py-5">
             <i class="bi bi-box-seam display-4 opacity-25"></i>
             <p class="mt-2">冰箱空空如也，快去<a href="/food/add-page">录入食材</a>吧！</p>
           </div>
-
-          <div class="form-check custom-check mb-2" th:each="food : ${foods}">
-            <input class="form-check-input" type="checkbox" name="foodIds" th:value="${food.id}" th:id="'food-'+${food.id}">
-            <label class="form-check-label w-100" th:for="'food-'+${food.id}">
-              <span class="fw-medium" th:text="${food.name}">食材名</span>
-              <small class="text-muted float-end" th:text="${food.quantity} + ${food.unit}">数量</small>
-            </label>
-          </div>
-        </div>
+        </template>
 
         <button onclick="generateRecipe()" class="btn btn-primary w-100 mt-3 py-3 btn-glow rounded-pill fw-bold" id="btn-generate">
           <i class="bi bi-stars me-2"></i>立即生成菜谱

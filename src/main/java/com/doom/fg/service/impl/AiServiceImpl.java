@@ -100,86 +100,42 @@ public class AiServiceImpl implements AiService {
 
     public String getRecipe(List<String> foods) {
         Long userId = UserContext.getUserId();
+        String redisKey = HISTORY_KEY_PREFIX + userId;
+
+        // 1. 【关键】新生成意味着新会话，必须清空旧的历史记忆
+        redisTemplate.delete(redisKey);
+
+        // 2. 构建提示词
         String foodList = String.join("、", foods);
-        String systemPrompt = "你是一个专业的\"智能冰箱菜谱助手\"。\n" +
-                "你的职责是：仅且只能根据用户提供的食材给出菜谱建议。\n" +
-                "严格规则：\n" +
-                "如果用户提供的食材可以组合成菜肴，请按 Markdown 格式提供菜名、食材和步骤。\n" +
-                "如果用户输入的不是食材，或者询问的问题与\"做菜、食材处理、菜谱推荐\"无关（例如问天气、写代码、聊政治、讲笑话等），你必须直接且仅回复\"抱歉！\"，不要带任何解释。\n" +
-                "即使食材包含不能吃的东西，也要识别并拒绝。";
 
-        String userPrompt = "我现在冰箱里有这些食材：" + foodList + "。请帮我设计一个菜谱。";
+        // --- System Prompt (设定严格边界) ---
+        String systemPrompt = "你是一个专业的'冰箱守卫者'主厨。你的任务是基于用户提供的食材清单设计菜谱。\n" +
+                "【核心规则】\n" +
+                "1. 严禁引入清单中不存在的主食材（肉类、蔬菜、蛋奶等）。你可以假设用户拥有基础调料（油盐酱醋糖、葱姜蒜、辣椒等）。\n" +
+                "2. 如果用户提供的食材无法组合成常规菜肴，请发挥创意进行混搭，或者礼貌告知无法生成。\n" +
+                "3. 输出格式要求：Markdown格式，包含菜名、食材表、详细步骤、营养贴士。\n" +
+                "4. 这一步是确立“食材范围”的关键，后续对话将严格限制在这个范围内。";
 
-        Map<String, Object> requestBody = new HashMap<>();
-        requestBody.put("model", "deepseek-chat");
-        requestBody.put("temperature", 0.3);
+        String userPrompt = "我冰箱里有这些食材：" + foodList + "。请帮我设计一道美味的家常菜。";
 
-        Map<String, String> systemMessage = new HashMap<>();
-        systemMessage.put("role", "system");
-        systemMessage.put("content", systemPrompt);
+        // 3. 准备请求消息链
+        List<AiMessage> messages = new ArrayList<>();
+        messages.add(new AiMessage("system", systemPrompt));
+        messages.add(new AiMessage("user", userPrompt));
 
-        Map<String, String> userMessage = new HashMap<>();
-        userMessage.put("role", "user");
-        userMessage.put("content", userPrompt);
+        // 4. 调用 AI
+        String aiReply = callDeepSeekApi(messages);
 
-        requestBody.put("messages", List.of(systemMessage, userMessage));
-
-        String json = JSON.toJSONString(requestBody);
-
-        RequestBody body = RequestBody.create(json, MediaType.get("application/json; charset=utf-8"));
-        Request request = new Request.Builder()
-                .url(apiUrl)
-                .addHeader("Authorization", "Bearer " + apiKey)
-                .post(body)
-                .build();
-
-        AiApiLog log = new AiApiLog();
-        log.setUserId(userId);
-        log.setModel("deepseek-chat");
-        log.setRequestType("RECIPE");
-
-        long start = System.currentTimeMillis();
-
-        try (Response response = client.newCall(request).execute()) {
-            long end = System.currentTimeMillis();
-            log.setLatencyMs(end - start);
-            log.setStatusCode(response.code());
-
-            String responseBody = response.body() != null ? response.body().string() : "";
-            System.out.println("AI API Response Code: " + response.code());
-            System.out.println("AI API Response Body: " + responseBody);
-
-            if (response.isSuccessful()) {
-                JSONObject resObj = JSON.parseObject(responseBody);
-
-                if (resObj.containsKey("usage")) {
-                    JSONObject usage = resObj.getJSONObject("usage");
-                    log.setPromptTokens(usage.getIntValue("prompt_tokens"));
-                    log.setCompletionTokens(usage.getIntValue("completion_tokens"));
-                    log.setTotalTokens(usage.getIntValue("total_tokens"));
-                }
-
-                log.setIsSuccess(1);
-                aiApiLogMapper.insert(log);
-
-                return resObj.getJSONArray("choices").getJSONObject(0).getJSONObject("message").getString("content");
-            } else {
-                log.setIsSuccess(0);
-                log.setErrorMsg("API Error: " + response.code() + " - " + responseBody);
-                aiApiLogMapper.insert(log);
-                return "API 调用失败（状态码：" + response.code() + "），请检查配置。";
-            }
-        } catch (IOException e) {
-            log.setLatencyMs(System.currentTimeMillis() - start);
-            log.setIsSuccess(0);
-            log.setStatusCode(500);
-            log.setErrorMsg(e.getMessage());
-            aiApiLogMapper.insert(log);
-
-            System.err.println("AI API Exception: " + e.getMessage());
-            e.printStackTrace();
-            return "网络错误：" + e.getMessage();
+        // 5. 【关键】构建初始记忆上下文
+        // 只有调用成功才存入 Redis，这样后续的 chatWithHistory 才能读到这些食材信息
+        if (aiReply != null && !aiReply.startsWith("Error")) {
+            // 存入 User: "我有A,B,C..."
+            saveToRedis(redisKey, new AiMessage("user", userPrompt));
+            // 存入 AI: "推荐菜谱X..."
+            saveToRedis(redisKey, new AiMessage("assistant", aiReply));
         }
+
+        return aiReply;
     }
 
     /**
@@ -197,27 +153,42 @@ public class AiServiceImpl implements AiService {
     /**
      * 支持上下文的通用对话接口
      */
+    @Override
     public String chatWithHistory(String userMessage) {
         Long userId = UserContext.getUserId();
         String redisKey = HISTORY_KEY_PREFIX + userId;
 
-        // 1. 准备 System Prompt (系统人设)
-        // 注意：System Prompt 通常不存入 Redis，而是每次请求时放在第一条
-        AiMessage systemMsg = new AiMessage("system", "你是一个专业的冰箱食材管理助手，请帮助用户规划菜谱和管理库存。");
-
-        // 2. 从 Redis 获取历史记录
+        // 1. 获取历史记录
         List<AiMessage> history = getHistoryFromRedis(redisKey);
 
-        // 3. 构建本次请求的消息列表 (System + History + Current User Msg)
-        List<AiMessage> requestMessages = new ArrayList<>();
-        requestMessages.add(systemMsg);
-        requestMessages.addAll(history);
-        requestMessages.add(new AiMessage("user", userMessage));
+        // 如果 Redis 里没数据，说明用户没先生成菜谱直接发请求，或者缓存过期了
+        if (history == null || history.isEmpty()) {
+            return "抱歉，我的记忆好像断片了。请先在左侧勾选食材并点击“生成菜谱”，让我先了解您有哪些食材。";
+        }
 
-        // 4. 发送请求给 DeepSeek
-        String aiReply = callDeepSeekApi(requestMessages);
+        // 2. 构建请求消息链
+        List<AiMessage> messages = new ArrayList<>();
 
-        // 5. 如果调用成功，将本次对话存入 Redis (异步或同步均可)
+        // --- System Prompt (强化锁定逻辑) ---
+        // 这里的提示词专门针对“后续对话”，强调不能偏题
+        String systemPrompt = "你是一个贴心的厨师助手。用户正在根据之前生成的菜谱（见上下文）提出调整需求。\n" +
+                "【严格指令】\n" +
+                "1. 你的回答必须 **完全基于上下文中的食材清单**。严禁在建议中引入新的主食材（如肉、菜），除非用户显式补充了新食材。\n" +
+                "2. 用户的调整（如'太淡了'、'不想炸'、'做成汤'）只能通过调整调料、烹饪方式或去除某些现有食材来实现。\n" +
+                "3. 如果用户的要求在现有食材下无法实现（例如只有'鸡蛋'却要求'做红烧肉'），请礼貌拒绝并解释原因，建议用户重新录入食材。";
+
+        messages.add(new AiMessage("system", systemPrompt));
+
+        // 加入历史 (包含了之前的食材声明和菜谱)
+        messages.addAll(history);
+
+        // 加入当前用户的调整指令
+        messages.add(new AiMessage("user", userMessage));
+
+        // 3. 调用 AI
+        String aiReply = callDeepSeekApi(messages);
+
+        // 4. 保存新一轮对话到 Redis (滑动窗口)
         if (aiReply != null && !aiReply.startsWith("Error")) {
             saveToRedis(redisKey, new AiMessage("user", userMessage));
             saveToRedis(redisKey, new AiMessage("assistant", aiReply));
@@ -226,7 +197,7 @@ public class AiServiceImpl implements AiService {
         return aiReply;
     }
     /**
-     * 存储消息到 Redis
+     * 存入 Redis 并维护长度
      */
     private List<AiMessage> getHistoryFromRedis(String key) {
         // 从 Redis List 获取所有数据
@@ -242,8 +213,7 @@ public class AiServiceImpl implements AiService {
         // 1. 推入新消息
         redisTemplate.opsForList().rightPush(key, JSON.toJSONString(message));
 
-        // 2. 裁剪长度 (保持最新的 N 条)
-        // 如果当前长度 > MAX，移除头部旧数据
+        // 2.滑动窗口：只保留最近 10 条消息 (5轮对话)，避免 Token 消耗过大
         Long size = redisTemplate.opsForList().size(key);
         if (size != null && size > MAX_HISTORY_SIZE) {
             redisTemplate.opsForList().trim(key, size - MAX_HISTORY_SIZE, -1);

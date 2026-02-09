@@ -5,7 +5,7 @@
 
 /* 复选框样式优化 */
 .custom-check {
-  padding: 10px 15px;
+  padding: 10px 25px;
   border-radius: 12px;
   transition: background 0.2s;
   cursor: pointer;
