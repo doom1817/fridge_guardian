@@ -21,9 +21,9 @@ public class AiApiLog {
     private String model;
     private String requestType;
 
-    private Integer promptTokens;
-    private Integer completionTokens;
-    private Integer totalTokens;
+    private Integer promptTokens = 0;
+    private Integer completionTokens = 0;
+    private Integer totalTokens = 0;
 
     private Long latencyMs;
     private Integer statusCode;
