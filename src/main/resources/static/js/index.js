@@ -1,11 +1,26 @@
-const token = localStorage.getItem("fg_token");
+console.log("=== Index.js 开始执行 ===");
+console.log("localStorage fg_token:", localStorage.getItem("fg_token"));
+console.log("sessionStorage fg_token:", sessionStorage.getItem("fg_token"));
+
+const token =
+  localStorage.getItem("fg_token") || sessionStorage.getItem("fg_token");
+const user =
+  localStorage.getItem("fg_user") || sessionStorage.getItem("fg_user");
+
+console.log("Final token:", token);
+console.log("Final user:", user);
+
 if (!token) {
+  console.log("=== 没有找到 token，跳转到登录页 ===");
+  alert("未登录，请先登录");
   window.location.href = "/login";
+} else {
+  console.log("=== Token 存在，继续执行 ===");
+  document.getElementById("currentUser").textContent = user || "用户";
 }
-document.getElementById("currentUser").textContent = localStorage.getItem("fg_user") || "用户";
 
 function doLogout() {
-  if(confirm("确定要退出登录吗？")) {
+  if (confirm("确定要退出登录吗？")) {
     localStorage.removeItem("fg_token");
     window.location.href = "/login";
   }
@@ -13,7 +28,7 @@ function doLogout() {
 
 async function fetchWithAuth(url) {
   const res = await fetch(url, {
-    headers: { "Authorization": token }
+    headers: { Authorization: token },
   });
   if (res.status === 401) {
     localStorage.removeItem("fg_token");
@@ -30,7 +45,9 @@ async function initDashboard() {
       animateValue("totalProcessed", 0, stats.total || 0, 1000);
       initChart(stats);
     }
-  } catch(e) { console.error(e); }
+  } catch (e) {
+    console.error(e);
+  }
 
   try {
     const expireRes = await fetchWithAuth("/api/food/expiring");
@@ -41,15 +58,19 @@ async function initDashboard() {
       const tbody = document.getElementById("tableBody");
       tbody.innerHTML = "";
 
-      if(list.length === 0) {
+      if (list.length === 0) {
         document.getElementById("emptyState").style.display = "block";
         document.getElementById("expiringTable").style.display = "none";
       } else {
-        list.forEach(item => {
+        list.forEach((item) => {
           const tr = document.createElement("tr");
           const isUrgent = item.daysLeft <= 1;
-          const badgeClass = isUrgent ? 'bg-danger text-white shadow-sm' : 'bg-warning text-dark';
-          const icon = isUrgent ? '<i class="bi bi-exclamation-circle-fill me-1"></i>' : '';
+          const badgeClass = isUrgent
+            ? "bg-danger text-white shadow-sm"
+            : "bg-warning text-dark";
+          const icon = isUrgent
+            ? '<i class="bi bi-exclamation-circle-fill me-1"></i>'
+            : "";
 
           tr.innerHTML = `
             <td>
@@ -59,7 +80,7 @@ async function initDashboard() {
                 </div>
                 <div>
                   <div class="fw-bold text-dark">${item.name}</div>
-                  <small class="text-muted" style="font-size:0.75rem">${item.storageLocation || '冷藏'}</small>
+                  <small class="text-muted" style="font-size:0.75rem">${item.storageLocation || "冷藏"}</small>
                 </div>
               </div>
             </td>
@@ -74,7 +95,9 @@ async function initDashboard() {
         });
       }
     }
-  } catch(e) { console.error(e); }
+  } catch (e) {
+    console.error(e);
+  }
 }
 
 function animateValue(id, start, end, duration) {
@@ -94,42 +117,44 @@ function animateValue(id, start, end, duration) {
 function initChart(stats) {
   const chart = echarts.init(document.getElementById("statisticsChart"));
   const option = {
-    color: ['#00b894', '#ff7675'],
+    color: ["#00b894", "#ff7675"],
     tooltip: {
       trigger: "item",
-      backgroundColor: 'rgba(255, 255, 255, 0.9)',
+      backgroundColor: "rgba(255, 255, 255, 0.9)",
       borderWidth: 0,
-      textStyle: { color: '#2d3436' },
-      formatter: "{b}: <b>{c}</b> ({d}%)"
+      textStyle: { color: "#2d3436" },
+      formatter: "{b}: <b>{c}</b> ({d}%)",
     },
     legend: { bottom: "0", itemGap: 20 },
-    series: [{
-      name: "处理状态",
-      type: "pie",
-      radius: ["50%", "75%"],
-      center: ['50%', '45%'],
-      avoidLabelOverlap: false,
-      itemStyle: {
-        borderRadius: 10,
-        borderColor: '#fff',
-        borderWidth: 2
+    series: [
+      {
+        name: "处理状态",
+        type: "pie",
+        radius: ["50%", "75%"],
+        center: ["50%", "45%"],
+        avoidLabelOverlap: false,
+        itemStyle: {
+          borderRadius: 10,
+          borderColor: "#fff",
+          borderWidth: 2,
+        },
+        label: { show: false },
+        emphasis: {
+          scale: true,
+          scaleSize: 10,
+          label: {
+            show: true,
+            fontSize: 16,
+            fontWeight: "bold",
+            color: "#2d3436",
+          },
+        },
+        data: [
+          { value: stats.consumed || 0, name: "健康食用" },
+          { value: stats.wasted || 0, name: "遗憾浪费" },
+        ],
       },
-      label: { show: false },
-      emphasis: {
-        scale: true,
-        scaleSize: 10,
-        label: {
-          show: true,
-          fontSize: 16,
-          fontWeight: 'bold',
-          color: '#2d3436'
-        }
-      },
-      data: [
-        { value: stats.consumed || 0, name: "健康食用" },
-        { value: stats.wasted || 0, name: "遗憾浪费" }
-      ]
-    }]
+    ],
   };
   chart.setOption(option);
   window.addEventListener("resize", () => chart.resize());

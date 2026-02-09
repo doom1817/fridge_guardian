@@ -9,6 +9,8 @@ import org.apache.shiro.web.filter.authc.BasicHttpAuthenticationFilter;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.RequestMethod;
+
+import java.io.IOException;
 /**
  * Created with IntelliJ IDEA.
  *
@@ -21,6 +23,21 @@ public class JwtFilter extends BasicHttpAuthenticationFilter {
 
     @Autowired
     private JwtUtil jwtUtil;
+
+    /**
+     * 核心修复点：重写 onAccessDenied
+     * 当 isAccessAllowed 返回 false 时（即没有 Token 或认证失败），
+     * 覆盖父类默认的 "弹窗" 行为，改为直接返回 JSON 错误。
+     */
+    @Override
+    protected boolean onAccessDenied(ServletRequest request, ServletResponse response) throws IOException {
+        HttpServletResponse httpResponse = (HttpServletResponse) response;
+        httpResponse.setCharacterEncoding("UTF-8");
+        httpResponse.setContentType("application/json;charset=UTF-8");
+        httpResponse.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+        httpResponse.getWriter().write("{\"code\": 401, \"msg\": \"未登录或登录过期\", \"data\": null}");
+        return false;
+    }
 
     /**
      * 检查是否允许访问

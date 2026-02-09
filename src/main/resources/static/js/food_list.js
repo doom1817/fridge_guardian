@@ -1,4 +1,4 @@
-const token = localStorage.getItem("fg_token");
+const token = localStorage.getItem("fg_token") || sessionStorage.getItem("fg_token");
 if(!token) window.location.href = "/login";
 
 async function loadData() {
