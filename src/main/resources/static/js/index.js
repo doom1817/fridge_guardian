@@ -1,4 +1,3 @@
-console.log("=== Index.js 开始执行 ===");
 console.log("localStorage fg_token:", localStorage.getItem("fg_token"));
 console.log("sessionStorage fg_token:", sessionStorage.getItem("fg_token"));
 
