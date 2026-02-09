@@ -2,6 +2,7 @@ package com.doom.fg.service.impl;
 
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONObject;
+import com.doom.fg.context.UserContext;
 import com.doom.fg.entity.FoodItem;
 import com.doom.fg.entity.RecipeRecord;
 import com.doom.fg.service.AiService;
@@ -59,8 +60,14 @@ public class AiServiceImpl implements AiService {
     }
 
     private void saveRecipeRecord(String foodNames, String content) {
+        Long userId = UserContext.getUserId();
+        
+        if (userId == null) {
+            throw new RuntimeException("用户未登录，无法保存菜谱记录");
+        }
+        
         RecipeRecord record = new RecipeRecord();
-        record.setUserId(1L);
+        record.setUserId(userId);
         record.setFoodNames(foodNames);
         record.setTitle("AI 生成的菜谱");
         record.setContent(content);

@@ -1,12 +1,11 @@
 package com.doom.fg.controller;
 
 import com.doom.fg.common.Result;
+import com.doom.fg.context.UserContext;
 import com.doom.fg.entity.Category;
 import com.doom.fg.entity.FoodItem;
-import com.doom.fg.entity.User;
 import com.doom.fg.service.CategoryService;
 import com.doom.fg.service.FoodItemService;
-import org.apache.shiro.SecurityUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -29,15 +28,10 @@ public class FoodApiController {
     @Autowired
     private CategoryService categoryService;
 
-    // 获取当前登录用户的辅助方法
-    private User getCurrentUser() {
-        return (User) SecurityUtils.getSubject().getPrincipal();
-    }
-
     // 1. 获取所有在库食材 (按过期时间排序)
     @GetMapping("/list")
     public Result<List<FoodItem>> getInStockList() {
-        Long userId = getCurrentUser().getId();
+        Long userId = UserContext.getUserId();
         List<FoodItem> list = foodItemService.lambdaQuery()
                 .eq(FoodItem::getUserId, userId)
                 .eq(FoodItem::getStatus, 0)
@@ -50,7 +44,7 @@ public class FoodApiController {
     // 2. 新增食材
     @PostMapping("/add")
     public Result<Void> addFood(@RequestBody FoodItem foodItem) {
-        foodItem.setUserId(getCurrentUser().getId());
+        foodItem.setUserId(UserContext.getUserId());
         foodItemService.saveFoodWithExpiry(foodItem, null);
         return Result.success(null);
     }
@@ -58,8 +52,7 @@ public class FoodApiController {
     // 3. 获取临期食材 (合并后的版本：支持参数 + 用户过滤)
     @GetMapping("/expiring")
     public Result<List<FoodItem>> getExpiringSoon(@RequestParam(defaultValue = "3") int days) {
-        // 1. 获取当前用户
-        Long userId = getCurrentUser().getId();
+        Long userId = UserContext.getUserId();
 
         // 2. 调用 Service 获取所有临期食材
         // (注意：为了不改动 Service 接口签名，我们在这里做内存过滤，这对于软著项目完全足够)
@@ -73,10 +66,10 @@ public class FoodApiController {
         return Result.success(myExpiring);
     }
 
-    // 4. 标记食材状态
+    // 4. 标记食材状态 (核心业务：标记为吃掉或浪费)
     @PutMapping("/{id}/status")
     public Result<Void> updateStatus(@PathVariable Long id, @RequestParam Integer status) {
-        Long userId = getCurrentUser().getId();
+        Long userId = UserContext.getUserId();
         foodItemService.lambdaUpdate()
                 .eq(FoodItem::getUserId, userId)
                 .set(FoodItem::getStatus, status)
@@ -94,7 +87,7 @@ public class FoodApiController {
     // 6. 获取统计数据
     @GetMapping("/statistics")
     public Result<Map<String, Object>> getStatistics() {
-        Long userId = getCurrentUser().getId();
+        Long userId = UserContext.getUserId();
         long consumedCount = foodItemService.lambdaQuery()
                 .eq(FoodItem::getUserId, userId)
                 .eq(FoodItem::getStatus, 1)

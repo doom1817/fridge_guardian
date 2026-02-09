@@ -1,9 +1,12 @@
 package com.doom.fg.security;
+import com.doom.fg.context.UserContext;
+import com.doom.fg.util.JwtUtil;
 import jakarta.servlet.ServletRequest;
 import jakarta.servlet.ServletResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.apache.shiro.web.filter.authc.BasicHttpAuthenticationFilter;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.RequestMethod;
 /**
@@ -15,6 +18,9 @@ import org.springframework.web.bind.annotation.RequestMethod;
  * 拦截 HTTP 请求，检查 Header 里有没有 Token。如果有，就提取出来扔给 Shiro 去验证。同时处理跨域问题。
  */
 public class JwtFilter extends BasicHttpAuthenticationFilter {
+
+    @Autowired
+    private JwtUtil jwtUtil;
 
     /**
      * 检查是否允许访问
@@ -52,13 +58,24 @@ public class JwtFilter extends BasicHttpAuthenticationFilter {
         String token = httpServletRequest.getHeader("Authorization");
 
         JwtToken jwtToken = new JwtToken(token);
-        // 提交给 Realm 进行登录，如果失败会抛出异常
         try {
             getSubject(request, response).login(jwtToken);
+            
+            Long userId = jwtUtil.getUserId(token);
+            UserContext.setUserId(userId);
+            
             return true;
         } catch (Exception e) {
             return false;
         }
+    }
+
+    /**
+     * 请求完成后清理 ThreadLocal
+     */
+    @Override
+    public void afterCompletion(ServletRequest request, ServletResponse response, Exception exception) {
+        UserContext.clear();
     }
 
     /**
