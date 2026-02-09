@@ -1,7 +1,13 @@
+-- ==================================================
+-- 冰箱守卫者 (Fridge Guardian) 完整数据库脚本
+-- 版本: V2.0 (含日志表 & 2026年测试数据)
+-- ==================================================
+
 -- --------------------------------------------------
--- 1. 创建数据库
+-- 1. 初始化数据库
 -- --------------------------------------------------
-CREATE DATABASE IF NOT EXISTS fridge_guardian CHARACTER SET utf8mb4;
+DROP DATABASE IF EXISTS fridge_guardian;
+CREATE DATABASE fridge_guardian CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
 USE fridge_guardian;
 
 -- --------------------------------------------------
@@ -59,12 +65,44 @@ CREATE TABLE `recipe_record` (
                                  `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB COMMENT='AI菜谱历史';
 
+-- --------------------------------------------------
+-- 6. AI 接口调用日志表 (新增)
+-- --------------------------------------------------
+CREATE TABLE `ai_api_log` (
+                              `id` BIGINT PRIMARY KEY AUTO_INCREMENT,
+                              `user_id` BIGINT NOT NULL COMMENT '调用用户ID',
+                              `model` VARCHAR(50) DEFAULT 'deepseek-chat' COMMENT '调用的模型',
+                              `request_type` VARCHAR(50) DEFAULT 'RECIPE' COMMENT '请求类型: 菜谱生成/其他',
 
--- 1. 插入测试用户 (密码均为123456，实际开发建议用BCrypt)
+    -- 消耗统计
+                              `prompt_tokens` INT DEFAULT 0 COMMENT '提问消耗Token',
+                              `completion_tokens` INT DEFAULT 0 COMMENT '回答消耗Token',
+                              `total_tokens` INT DEFAULT 0 COMMENT '总消耗Token',
+
+    -- 性能与状态
+                              `latency_ms` BIGINT COMMENT '接口耗时(毫秒)',
+                              `status_code` INT COMMENT 'HTTP状态码 (200为成功)',
+                              `is_success` TINYINT(1) DEFAULT 1 COMMENT '业务是否成功 1-是 0-否',
+                              `error_msg` TEXT COMMENT '如果失败，记录错误信息',
+
+                              `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB COMMENT='AI接口调用日志';
+
+
+-- ==================================================
+-- 数据初始化 (基于 2026-02-09 的模拟时间)
+-- ==================================================
+
+-- 1. 插入测试用户
+-- 密码明文: 123456 (注意: 生产环境请务必使用 BCrypt 加密后的密文)
+-- 如果您的代码开启了 BCrypt，请使用: $2a$10$N.zmdr9k7uOCQb376Noe8uNoRElr.eC9FzF.Qf.t.w/i.. (这里先存明文方便您测试，或者您自己运行 Test 生成)
 INSERT INTO `user` (username, password, email) VALUES
-    ('小明', '123456', 'xiaoming@example.com');
+    ('小明', '$2a$10$x8/2.0/..123456..HASH_PLACEHOLDER..', 'xiaoming@example.com');
+-- 注意：如果您还没集成 BCrypt，这里 password 请改成 '123456'
+UPDATE `user` SET password = '123456' WHERE username = '小明';
 
--- 2. 插入初始化分类
+
+-- 2. 插入食材分类
 INSERT INTO `category` (name, default_expiry_days, icon) VALUES
                                                              ('新鲜蔬菜', 3, 'leaf'),
                                                              ('肉类禽蛋', 5, 'drumstick'),
@@ -73,25 +111,31 @@ INSERT INTO `category` (name, default_expiry_days, icon) VALUES
                                                              ('乳品烘焙', 10, 'cheese'),
                                                              ('零食干货', 60, 'cookie');
 
--- 3. 插入食材库存 (模拟各种场景)
--- 假设今天是 2024-05-20 (请根据你测试时的实际日期微调)
+-- 3. 插入食材库存 (关键：日期已调整为 2026年2月)
+-- 假设当前日期为 2026-02-09
 
 INSERT INTO `food_item` (user_id, category_id, name, quantity, unit, purchase_date, expiry_date, storage_location, status) VALUES
--- 场景：即将过期的食材 (用于首页红色高亮提醒)
-(1, 1, '菠菜', 1, '把', '2024-05-18', '2024-05-21', 'FRIDGE', 0),
-(1, 5, '鲜牛奶', 1, '盒', '2024-05-12', '2024-05-22', 'FRIDGE', 0),
 
--- 场景：正常的食材
-(1, 2, '澳洲和牛', 500, '克', '2024-05-19', '2024-05-24', 'FREEZER', 0),
-(1, 4, '红富士苹果', 5, '个', '2024-05-20', '2024-05-30', 'FRIDGE', 0),
+-- [场景A：非常紧急] 今天(2.9)就过期
+(1, 5, '鲜牛奶', 1, '盒', '2026-02-01', '2026-02-09', 'FRIDGE', 0),
 
--- 场景：已经吃完的食材 (用于统计图表)
-(1, 1, '西红柿', 3, '个', '2024-05-10', '2024-05-13', 'FRIDGE', 1),
-(1, 3, '三文鱼', 200, '克', '2024-05-10', '2024-05-12', 'FRIDGE', 1),
+-- [场景B：临期预警] 明天(2.10)过期 (剩余1天 -> 红色/橙色高亮)
+(1, 1, '菠菜', 2, '把', '2026-02-07', '2026-02-10', 'FRIDGE', 0),
 
--- 场景：不小心放过期浪费了的食材 (用于浪费率统计)
-(1, 5, '切片面包', 1, '袋', '2024-05-01', '2024-05-07', 'PANTRY', 2);
+-- [场景C：临期预警] 后天(2.11)过期 (剩余2天 -> 黄色提醒)
+(1, 3, '基围虾', 500, '克', '2026-02-08', '2026-02-11', 'FRIDGE', 0),
 
--- 4. 插入一条模拟 AI 菜谱历史
-INSERT INTO `recipe_record` (user_id, food_names, title, content) VALUES
-    (1, '菠菜, 牛肉', '元气菠菜炒牛肉', '### 烹饪步骤\n1. 将牛肉切片腌制...\n2. 菠菜焯水...\n3. 大火快炒...');
+-- [场景D：状态良好] 还有很久过期 (绿色)
+(1, 2, '澳洲和牛', 500, '克', '2026-02-05', '2026-02-20', 'FREEZER', 0),
+(1, 4, '红富士苹果', 6, '个', '2026-02-08', '2026-02-28', 'FRIDGE', 0),
+(1, 6, '坚果礼盒', 1, '箱', '2026-01-20', '2026-05-20', 'PANTRY', 0),
+
+-- [场景E：历史数据 - 已吃完] (用于ECharts统计：健康食用)
+(1, 1, '西红柿', 3, '个', '2026-01-15', '2026-01-20', 'FRIDGE', 1),
+(1, 2, '鸡胸肉', 2, '块', '2026-01-18', '2026-01-21', 'FREEZER', 1),
+(1, 4, '草莓', 1, '盒', '2026-02-01', '2026-02-03', 'FRIDGE', 1),
+
+-- [场景F：历史数据 - 已浪费] (用于ECharts统计：遗憾浪费)
+(1, 5, '切片面包', 1, '袋', '2026-01-01', '2026-01-07', 'PANTRY', 2);
+
+-- 4. 菜谱记录与日志表保持为空，等待您亲自测试生成

@@ -3,8 +3,10 @@ package com.doom.fg.service.impl;
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONObject;
 import com.doom.fg.context.UserContext;
+import com.doom.fg.entity.AiApiLog;
 import com.doom.fg.entity.FoodItem;
 import com.doom.fg.entity.RecipeRecord;
+import com.doom.fg.mapper.AiApiLogMapper;
 import com.doom.fg.service.AiService;
 import com.doom.fg.service.FoodItemService;
 import com.doom.fg.service.RecipeRecordService;
@@ -28,6 +30,9 @@ public class AiServiceImpl implements AiService {
 
     @Autowired
     private RecipeRecordService recipeRecordService;
+
+    @Autowired
+    private AiApiLogMapper aiApiLogMapper;
 
     @Value("${ai.api-key}")
     private String apiKey;
@@ -75,6 +80,7 @@ public class AiServiceImpl implements AiService {
     }
 
     public String getRecipe(List<String> foods) {
+        Long userId = UserContext.getUserId();
         String foodList = String.join("、", foods);
         String systemPrompt = "你是一个专业的\"智能冰箱菜谱助手\"。\n" +
                 "你的职责是：仅且只能根据用户提供的食材给出菜谱建议。\n" +
@@ -108,19 +114,49 @@ public class AiServiceImpl implements AiService {
                 .post(body)
                 .build();
 
+        AiApiLog log = new AiApiLog();
+        log.setUserId(userId);
+        log.setModel("deepseek-chat");
+        log.setRequestType("RECIPE");
+
+        long start = System.currentTimeMillis();
+
         try (Response response = client.newCall(request).execute()) {
+            long end = System.currentTimeMillis();
+            log.setLatencyMs(end - start);
+            log.setStatusCode(response.code());
+
             String responseBody = response.body() != null ? response.body().string() : "";
             System.out.println("AI API Response Code: " + response.code());
             System.out.println("AI API Response Body: " + responseBody);
-            
+
             if (response.isSuccessful()) {
                 JSONObject resObj = JSON.parseObject(responseBody);
+
+                if (resObj.containsKey("usage")) {
+                    JSONObject usage = resObj.getJSONObject("usage");
+                    log.setPromptTokens(usage.getIntValue("prompt_tokens"));
+                    log.setCompletionTokens(usage.getIntValue("completion_tokens"));
+                    log.setTotalTokens(usage.getIntValue("total_tokens"));
+                }
+
+                log.setIsSuccess(1);
+                aiApiLogMapper.insert(log);
+
                 return resObj.getJSONArray("choices").getJSONObject(0).getJSONObject("message").getString("content");
             } else {
-                System.err.println("AI API Error: " + response.code() + " - " + responseBody);
+                log.setIsSuccess(0);
+                log.setErrorMsg("API Error: " + response.code() + " - " + responseBody);
+                aiApiLogMapper.insert(log);
                 return "API 调用失败（状态码：" + response.code() + "），请检查配置。";
             }
         } catch (IOException e) {
+            log.setLatencyMs(System.currentTimeMillis() - start);
+            log.setIsSuccess(0);
+            log.setStatusCode(500);
+            log.setErrorMsg(e.getMessage());
+            aiApiLogMapper.insert(log);
+
             System.err.println("AI API Exception: " + e.getMessage());
             e.printStackTrace();
             return "网络错误：" + e.getMessage();
