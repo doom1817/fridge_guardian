@@ -1,0 +1,240 @@
+:root {
+  --primary-color: #6c5ce7;
+  --success-color: #00b894;
+  --glass-bg: rgba(255, 255, 255, 0.65);
+  --glass-border: rgba(255, 255, 255, 0.5);
+  --shadow-light: 0 8px 32px 0 rgba(31, 38, 135, 0.15);
+}
+
+body {
+  background-color: #dfe6e9;
+  font-family: "Noto Sans SC", sans-serif;
+  min-height: 100vh;
+  overflow-x: hidden;
+  position: relative;
+}
+
+.background-blobs {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: -1;
+}
+
+.blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(60px);
+  opacity: 0.6;
+  animation: float 10s infinite ease-in-out;
+}
+
+.blob-1 {
+  top: -10%;
+  left: 30%;
+  width: 500px;
+  height: 500px;
+  background: #a29bfe;
+}
+
+.blob-2 {
+  bottom: -10%;
+  right: -10%;
+  width: 400px;
+  height: 400px;
+  background: #55efc4;
+  animation-delay: 2s;
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translate(0, 0);
+  }
+  50% {
+    transform: translate(20px, -40px);
+  }
+}
+
+.main-container {
+  max-width: 1200px;
+  margin: 40px auto;
+  padding: 0 20px;
+  animation: fadeInUp 0.8s forwards;
+}
+
+.glass-panel {
+  background: var(--glass-bg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--glass-border);
+  border-radius: 24px;
+  box-shadow: var(--shadow-light);
+  padding: 30px;
+  height: 100%;
+  min-height: 600px;
+  display: flex;
+  flex-direction: column;
+}
+
+.ingredient-list {
+  flex: 1;
+  overflow-y: auto;
+  padding-right: 10px;
+}
+
+.ingredient-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.ingredient-list::-webkit-scrollbar-thumb {
+  background: rgba(0,0,0,0.1);
+  border-radius: 10px;
+}
+
+.check-card {
+  position: relative;
+  display: flex;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.5);
+  border: 2px solid transparent;
+  border-radius: 15px;
+  padding: 12px 15px;
+  margin-bottom: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.check-card:hover {
+  background: rgba(255, 255, 255, 0.9);
+  transform: translateX(5px);
+}
+
+.check-card input {
+  display: none;
+}
+
+.check-card.selected {
+  background: rgba(0, 184, 148, 0.1);
+  border-color: #00b894;
+}
+
+.check-card.selected .check-icon {
+  background: #00b894;
+  color: white;
+  border-color: #00b894;
+}
+
+.check-icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 2px solid #b2bec3;
+  margin-right: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  color: transparent;
+}
+
+.recipe-paper {
+  background: #fff;
+  border-radius: 20px;
+  padding: 40px;
+  height: 100%;
+  box-shadow: inset 0 0 40px rgba(0,0,0,0.02);
+  border: 1px solid rgba(0,0,0,0.05);
+  overflow-y: auto;
+  position: relative;
+}
+
+.recipe-content {
+  line-height: 1.8;
+  color: #2d3436;
+}
+
+.recipe-content h1,
+.recipe-content h2,
+.recipe-content h3 {
+  color: #00b894;
+  margin-top: 20px;
+  font-weight: 700;
+}
+
+.recipe-content ul {
+  padding-left: 20px;
+}
+
+.recipe-content li {
+  margin-bottom: 8px;
+}
+
+.recipe-content strong {
+  color: #2d3436;
+  background: rgba(0, 184, 148, 0.1);
+  padding: 0 4px;
+  border-radius: 4px;
+}
+
+.empty-state {
+  text-align: center;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: #b2bec3;
+}
+
+.loading-container {
+  text-align: center;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.chef-hat {
+  font-size: 4rem;
+  color: #00b894;
+  animation: bounce 1s infinite alternate;
+}
+
+@keyframes bounce {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(-20px);
+  }
+}
+
+.btn-magic {
+  background: linear-gradient(135deg, #00b894, #55efc4);
+  border: none;
+  padding: 15px;
+  border-radius: 15px;
+  font-weight: 700;
+  color: white;
+  letter-spacing: 1px;
+  box-shadow: 0 8px 15px rgba(0, 184, 148, 0.3);
+  transition: all 0.3s;
+}
+
+.btn-magic:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 20px rgba(0, 184, 148, 0.4);
+  color: white;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

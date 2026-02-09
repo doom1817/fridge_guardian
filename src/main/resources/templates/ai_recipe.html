@@ -1,376 +1,102 @@
 <!doctype html>
 <html>
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>AI 灵感配餐 - 冰箱守卫者</title>
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&display=swap" rel="stylesheet" />
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet" />
-  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-
-  <style>
-    :root {
-      --primary-color: #6c5ce7;
-      --success-color: #00b894;
-      --glass-bg: rgba(255, 255, 255, 0.65);
-      --glass-border: rgba(255, 255, 255, 0.5);
-      --shadow-light: 0 8px 32px 0 rgba(31, 38, 135, 0.15);
-    }
-
-    body {
-      background-color: #dfe6e9;
-      font-family: "Noto Sans SC", sans-serif;
-      min-height: 100vh;
-      overflow-x: hidden;
-      position: relative;
-    }
-
-    /* === 1. 动态背景 (统一风格) === */
-    .background-blobs {
-      position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -1;
-    }
-    .blob {
-      position: absolute; border-radius: 50%; filter: blur(60px); opacity: 0.6;
-      animation: float 10s infinite ease-in-out;
-    }
-    .blob-1 { top: -10%; left: 30%; width: 500px; height: 500px; background: #a29bfe; }
-    .blob-2 { bottom: -10%; right: -10%; width: 400px; height: 400px; background: #55efc4; animation-delay: 2s; }
-
-    @keyframes float {
-      0%, 100% { transform: translate(0, 0); }
-      50% { transform: translate(20px, -40px); }
-    }
-
-    /* === 2. 布局容器 === */
-    .main-container {
-      max-width: 1200px;
-      margin: 40px auto;
-      padding: 0 20px;
-      animation: fadeInUp 0.8s forwards;
-    }
-
-    .glass-panel {
-      background: var(--glass-bg);
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
-      border: 1px solid var(--glass-border);
-      border-radius: 24px;
-      box-shadow: var(--shadow-light);
-      padding: 30px;
-      height: 100%;
-      min-height: 600px;
-      display: flex;
-      flex-direction: column;
-    }
-
-    /* === 3. 左侧：食材选择胶囊 === */
-    .ingredient-list {
-      flex: 1;
-      overflow-y: auto;
-      padding-right: 10px;
-    }
-    /* 自定义滚动条 */
-    .ingredient-list::-webkit-scrollbar { width: 6px; }
-    .ingredient-list::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.1); border-radius: 10px; }
-
-    .check-card {
-      position: relative;
-      display: flex;
-      align-items: center;
-      background: rgba(255, 255, 255, 0.5);
-      border: 2px solid transparent;
-      border-radius: 15px;
-      padding: 12px 15px;
-      margin-bottom: 12px;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-    .check-card:hover {
-      background: rgba(255, 255, 255, 0.9);
-      transform: translateX(5px);
-    }
-
-    /* 隐藏原生 checkbox */
-    .check-card input { display: none; }
-
-    /* 选中状态 */
-    .check-card.selected {
-      background: rgba(0, 184, 148, 0.1);
-      border-color: #00b894;
-    }
-    .check-card.selected .check-icon {
-      background: #00b894;
-      color: white;
-      border-color: #00b894;
-    }
-
-    .check-icon {
-      width: 24px; height: 24px;
-      border-radius: 50%;
-      border: 2px solid #b2bec3;
-      margin-right: 15px;
-      display: flex; align-items: center; justify-content: center;
-      transition: all 0.2s;
-      color: transparent;
-    }
-
-    /* === 4. 右侧：智能餐单纸 === */
-    .recipe-paper {
-      background: #fff;
-      border-radius: 20px;
-      padding: 40px;
-      height: 100%;
-      box-shadow: inset 0 0 40px rgba(0,0,0,0.02);
-      border: 1px solid rgba(0,0,0,0.05);
-      overflow-y: auto;
-      position: relative;
-    }
-
-    /* Markdown 样式优化 */
-    .recipe-content { line-height: 1.8; color: #2d3436; }
-    .recipe-content h1, .recipe-content h2, .recipe-content h3 { color: #00b894; margin-top: 20px; font-weight: 700; }
-    .recipe-content ul { padding-left: 20px; }
-    .recipe-content li { margin-bottom: 8px; }
-    .recipe-content strong { color: #2d3436; background: rgba(0, 184, 148, 0.1); padding: 0 4px; border-radius: 4px; }
-
-    /* === 5. 动画状态 === */
-    .empty-state {
-      text-align: center;
-      position: absolute; top: 50%; left: 50%;
-      transform: translate(-50%, -50%);
-      color: #b2bec3;
-    }
-
-    .loading-container {
-      text-align: center;
-      position: absolute; top: 50%; left: 50%;
-      transform: translate(-50%, -50%);
-    }
-    .chef-hat {
-      font-size: 4rem;
-      color: #00b894;
-      animation: bounce 1s infinite alternate;
-    }
-    @keyframes bounce { from { transform: translateY(0); } to { transform: translateY(-20px); } }
-
-    /* 生成按钮 */
-    .btn-magic {
-      background: linear-gradient(135deg, #00b894, #55efc4);
-      border: none;
-      padding: 15px;
-      border-radius: 15px;
-      font-weight: 700;
-      color: white;
-      letter-spacing: 1px;
-      box-shadow: 0 8px 15px rgba(0, 184, 148, 0.3);
-      transition: all 0.3s;
-    }
-    .btn-magic:hover {
-      transform: translateY(-3px);
-      box-shadow: 0 12px 20px rgba(0, 184, 148, 0.4);
-      color: white;
-    }
-
-    @keyframes fadeInUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
-  </style>
-</head>
-<body>
-
-<div class="background-blobs">
-  <div class="blob blob-1"></div>
-  <div class="blob blob-2"></div>
-</div>
-
-<div class="main-container">
-  <div class="d-flex justify-content-between align-items-center mb-4">
-    <h2 class="fw-bold mb-0 text-dark"><i class="bi bi-stars text-success me-2"></i>AI 灵感配餐</h2>
-    <a href="/" class="btn btn-light rounded-pill px-4 shadow-sm fw-bold">
-      <i class="bi bi-house-door me-1"></i> 返回首页
-    </a>
-  </div>
-
-  <div class="row g-4" style="min-height: 650px;">
-
-    <div class="col-lg-4">
-      <div class="glass-panel">
-        <div class="d-flex justify-content-between align-items-center mb-3">
-          <h5 class="fw-bold mb-0">步骤 1: 勾选食材</h5>
-          <span class="badge bg-white text-secondary border">我的库存</span>
-        </div>
-
-        <div id="foodSelectionList" class="ingredient-list">
-          <div class="text-center py-4 text-muted small">
-            <div class="spinner-border spinner-border-sm text-secondary"></div> 正在读取冰箱...
-          </div>
-        </div>
-
-        <div class="mt-4 pt-3 border-top border-secondary-subtle">
-          <button class="btn btn-magic w-100" onclick="generateRecipe()">
-            <i class="bi bi-magic me-2"></i> 开始生成食谱
-          </button>
-        </div>
-      </div>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AI 灵感配餐 - 冰箱守卫者</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css"
+      rel="stylesheet"
+    />
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <link href="/css/ai_recipe.css" rel="stylesheet" />
+  </head>
+  <body>
+    <div class="background-blobs">
+      <div class="blob blob-1"></div>
+      <div class="blob blob-2"></div>
     </div>
 
-    <div class="col-lg-8">
-      <div class="glass-panel p-0 overflow-hidden border-0">
-        <div class="recipe-paper" id="recipeBox">
+    <div class="main-container">
+      <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="fw-bold mb-0 text-dark">
+          <i class="bi bi-stars text-success me-2"></i>AI 灵感配餐
+        </h2>
+        <a href="/" class="btn btn-light rounded-pill px-4 shadow-sm fw-bold">
+          <i class="bi bi-house-door me-1"></i> 返回首页
+        </a>
+      </div>
 
-          <div id="idleState" class="empty-state">
-            <i class="bi bi-basket3 display-1 mb-3 d-block opacity-50"></i>
-            <h4>等待主厨下令...</h4>
-            <p class="small">请在左侧勾选您想要处理的食材，<br>AI 将为您量身定制美味食谱。</p>
-          </div>
+      <div class="row g-4" style="min-height: 650px">
+        <div class="col-lg-4">
+          <div class="glass-panel">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+              <h5 class="fw-bold mb-0">步骤 1: 勾选食材</h5>
+              <span class="badge bg-white text-secondary border">我的库存</span>
+            </div>
 
-          <div id="loadingState" class="loading-container d-none">
-            <div class="chef-hat"><i class="bi bi-robot"></i></div>
-            <h4 class="mt-3 fw-bold text-success">AI 正在思考中...</h4>
-            <p class="text-muted">正在分析食材搭配与营养成分</p>
-            <div class="progress mt-3" style="width: 200px; height: 6px; margin: 0 auto;">
-              <div class="progress-bar progress-bar-striped progress-bar-animated bg-success" style="width: 100%"></div>
+            <div id="foodSelectionList" class="ingredient-list">
+              <div class="text-center py-4 text-muted small">
+                <div
+                  class="spinner-border spinner-border-sm text-secondary"
+                ></div>
+                正在读取冰箱...
+              </div>
+            </div>
+
+            <div class="mt-4 pt-3 border-top border-secondary-subtle">
+              <button class="btn btn-magic w-100" onclick="generateRecipe()">
+                <i class="bi bi-magic me-2"></i> 开始生成食谱
+              </button>
             </div>
           </div>
+        </div>
 
-          <div id="recipeResult" class="recipe-content d-none animate-enter">
+        <div class="col-lg-8">
+          <div class="glass-panel p-0 overflow-hidden border-0">
+            <div class="recipe-paper" id="recipeBox">
+              <div id="idleState" class="empty-state">
+                <i class="bi bi-basket3 display-1 mb-3 d-block opacity-50"></i>
+                <h4>等待主厨下令...</h4>
+                <p class="small">
+                  请在左侧勾选您想要处理的食材，<br />AI
+                  将为您量身定制美味食谱。
+                </p>
+              </div>
+
+              <div id="loadingState" class="loading-container d-none">
+                <div class="chef-hat"><i class="bi bi-robot"></i></div>
+                <h4 class="mt-3 fw-bold text-success">AI 正在思考中...</h4>
+                <p class="text-muted">正在分析食材搭配与营养成分</p>
+                <div
+                  class="progress mt-3"
+                  style="width: 200px; height: 6px; margin: 0 auto"
+                >
+                  <div
+                    class="progress-bar progress-bar-striped progress-bar-animated bg-success"
+                    style="width: 100%"
+                  ></div>
+                </div>
+              </div>
+
+              <div
+                id="recipeResult"
+                class="recipe-content d-none animate-enter"
+              ></div>
+            </div>
           </div>
-
         </div>
       </div>
     </div>
 
-  </div>
-</div>
-
-<script>
-  // 1. Token 校验
-  const token = localStorage.getItem("fg_token");
-  if (!token) window.location.href = "/login";
-
-  // 2. 加载食材列表 (带 Token)
-  fetch("/api/food/list", {
-    headers: { "Authorization": token }
-  })
-          .then((res) => {
-            if (res.status === 401) window.location.href = "/login";
-            return res.json();
-          })
-          .then((res) => {
-            const list = document.getElementById("foodSelectionList");
-            list.innerHTML = ""; // 清除 loading
-
-            if (!res.data || res.data.length === 0) {
-              list.innerHTML = `<div class="text-center text-muted py-5">冰箱空空如也<br><a href="/food/add-page" class="text-success">去买菜</a></div>`;
-              return;
-            }
-
-            res.data.forEach((food) => {
-              // ================= [核心修改] 人性化日期逻辑 =================
-              let daysText = "";
-              let daysClass = "text-muted"; // 默认灰色
-
-              if (food.daysLeft < 0) {
-                daysText = `已过期 ${Math.abs(food.daysLeft)} 天`;
-                daysClass = "text-danger fw-bold"; // 红色加粗
-              } else if (food.daysLeft === 0) {
-                daysText = "今天内过期 ⚠️";
-                daysClass = "text-danger fw-bold"; // 红色加粗
-              } else if (food.daysLeft === 1) {
-                daysText = "明天过期";
-                daysClass = "text-warning fw-bold"; // 橙色
-              } else if (food.daysLeft === 2) {
-                daysText = "后天过期";
-                daysClass = "text-warning"; // 黄色
-              } else {
-                daysText = `${food.daysLeft} 天后过期`;
-                // 默认为灰色
-              }
-              // ========================================================
-
-              // 创建胶囊卡片
-              const item = document.createElement("div");
-              item.className = "check-card";
-              item.innerHTML = `
-             <div class="check-icon"><i class="bi bi-check-lg"></i></div>
-             <div class="flex-grow-1">
-                 <div class="fw-bold text-dark">${food.name}</div>
-                 <small class="${daysClass}" style="font-size:0.75rem">
-                    ${daysText} · ${food.quantity}${food.unit||''}
-                 </small>
-             </div>
-             <input type="checkbox" value="${food.id}">
-          `;
-
-              // 点击交互事件
-              item.onclick = (e) => {
-                // 阻止事件冒泡
-                if (e.target.tagName === 'INPUT') return;
-
-                const checkbox = item.querySelector("input");
-                checkbox.checked = !checkbox.checked;
-
-                if (checkbox.checked) {
-                  item.classList.add("selected");
-                } else {
-                  item.classList.remove("selected");
-                }
-              };
-
-              list.appendChild(item);
-            });
-          });
-
-  // 3. 生成食谱逻辑
-  function generateRecipe() {
-    // 获取选中 ID
-    const ids = Array.from(document.querySelectorAll("input:checked")).map(i => i.value);
-
-    if (ids.length === 0) {
-      const btn = document.querySelector('.btn-magic');
-      btn.classList.add('bg-danger');
-      btn.innerText = "请至少选一个食材！";
-      setTimeout(() => {
-        btn.classList.remove('bg-danger');
-        btn.innerHTML = '<i class="bi bi-magic me-2"></i> 开始生成食谱';
-      }, 1500);
-      return;
-    }
-
-    // 切换 UI 状态
-    document.getElementById("idleState").classList.add("d-none");
-    document.getElementById("recipeResult").classList.add("d-none");
-    document.getElementById("loadingState").classList.remove("d-none");
-
-    // 发送请求 (带 Token)
-    fetch("/api/ai/generate-recipe", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": token
-      },
-      body: JSON.stringify(ids),
-    })
-            .then((res) => res.json())
-            .then((res) => {
-              // 隐藏 Loading
-              document.getElementById("loadingState").classList.add("d-none");
-
-              if (res.code === 200) {
-                const resultBox = document.getElementById("recipeResult");
-                resultBox.classList.remove("d-none");
-                // 渲染 Markdown
-                resultBox.innerHTML = marked.parse(res.data.content);
-              } else {
-                alert("生成失败：" + res.message);
-                document.getElementById("idleState").classList.remove("d-none");
-              }
-            })
-            .catch(err => {
-              alert("网络错误，请稍后再试");
-              document.getElementById("loadingState").classList.add("d-none");
-              document.getElementById("idleState").classList.remove("d-none");
-            });
-  }
-</script>
-</body>
+    <script src="/js/ai_recipe.js"></script>
+  </body>
 </html>

@@ -6,6 +6,8 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 
+import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -43,7 +45,7 @@ public interface AiApiLogMapper extends BaseMapper<AiApiLog> {
             "GROUP BY DATE(create_time) " +
             "ORDER BY DATE(create_time)")
     List<Map<String, Object>> getTokenTrendByUserId(@Param("userId") Long userId, 
-                                                     @Param("startDate") LocalDateTime startDate, 
+                                                     @Param("startDate") LocalDateTime startDate,
                                                      @Param("endDate") LocalDateTime endDate);
 
     @Select("SELECT " +
@@ -57,7 +59,7 @@ public interface AiApiLogMapper extends BaseMapper<AiApiLog> {
             "AND create_time < #{endDate} " +
             "GROUP BY DATE(create_time) " +
             "ORDER BY DATE(create_time)")
-    List<Map<String, Object>> getSuccessRateTrendByUserId(@Param("userId") Long userId, 
-                                                           @Param("startDate") LocalDateTime startDate, 
-                                                           @Param("endDate") LocalDateTime endDate);
+    List<Map<String, Object>> getSuccessRateTrendByUserId(@Param("userId") Long userId,
+                                                          @Param("startDate") LocalDateTime startDate,
+                                                          @Param("endDate") LocalDateTime endDate);
 }
