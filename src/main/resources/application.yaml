@@ -76,6 +76,6 @@ logging:
 
 # AI 配置
 ai:
-  api-key: { your_deepseek_api_key }
+  api-key: sk-1f7adfd6ef99498599bf9edd01d0118c
   api-url: https://api.deepseek.com/chat/completions
   model: deepseek-chat
