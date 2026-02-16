@@ -1,12 +1,15 @@
 package com.doom.fg.controller;
 
+import com.alibaba.fastjson2.JSON;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.doom.fg.common.Result;
 import com.doom.fg.context.UserContext;
 import com.doom.fg.entity.AiApiLog;
+import com.doom.fg.entity.User;
 import com.doom.fg.mapper.AiApiLogMapper;
 import com.doom.fg.service.AiService;
+import com.doom.fg.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -24,13 +27,23 @@ public class AiApiController {
 
     @Autowired
     private AiApiLogMapper aiApiLogMapper;
+    @Autowired
+    private UserService userService;
 
     @PostMapping("/generate-recipe")
     public Result<Map<String, String>> generateRecipe(@RequestBody List<Long> foodIds) {
         Map<String, String> recipe = aiService.getAiRecipe(foodIds);
         return Result.success(recipe);
     }
-
+    @PostMapping("/ai-config")
+    public Result<Void> updateAiConfig(@RequestBody Map<String, String> config) {
+        Long userId = UserContext.getUserId();
+        User user = userService.getById(userId);
+        // 将前端传来的 apiKey, baseUrl, model 序列化为 JSON
+        user.setAiConfig(JSON.toJSONString(config));
+        userService.updateById(user);
+        return Result.success();
+    }
     @GetMapping("/statistics")
     public Result<Map<String, Object>> getStatistics() {
         Long userId = UserContext.getUserId();

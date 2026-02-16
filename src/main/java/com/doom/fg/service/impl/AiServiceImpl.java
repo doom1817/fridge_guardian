@@ -68,6 +68,12 @@ public class AiServiceImpl implements AiService {
 
     @Override
     public Map<String, String> getAiRecipe(List<Long> foodIds) {
+        JSONObject config = getUserAiConfig();
+        // 如果配置为空，此处可抛出自定义异常，通知前端弹出配置窗口
+        if (config == null) {
+            throw new RuntimeException("AI_CONFIG_MISSING");
+        }
+
         List<FoodItem> foodItems = foodItemService.listByIds(foodIds);
         List<String> foodNames = foodItems.stream()
                 .map(FoodItem::getName)
@@ -180,7 +186,16 @@ public class AiServiceImpl implements AiService {
         }
         return aiReply;
     }
+    private JSONObject getUserAiConfig() {
+        Long userId = UserContext.getUserId();
+        User user = userService.getById(userId);
 
+        // 如果用户没有配置过 AI
+        if (user.getAiConfig() == null || user.getAiConfig().isEmpty()) {
+            return null;
+        }
+        return JSON.parseObject(user.getAiConfig());
+    }
     // --- 内部私有方法 (Redis维护) ---
     private List<AiMessage> getHistoryFromRedis(String key) {
         List<String> jsonList = redisTemplate.opsForList().range(key, 0, -1);
