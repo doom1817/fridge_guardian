@@ -25,6 +25,8 @@ public class User implements Serializable {
     private String username;
     private String password;
     private String email;
+    @TableField("ai_config")
+    private String aiConfig;
 
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createTime;
