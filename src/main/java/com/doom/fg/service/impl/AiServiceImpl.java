@@ -106,7 +106,6 @@ public class AiServiceImpl implements AiService {
         User user = userService.getById(userId);
 
         String redisKey = HISTORY_KEY_PREFIX + userId;
-        Boolean delete = redisTemplate.delete(redisKey);
         // 1. 获取配置路由 (解决变量缺失问题)
         AiConfig config = getEffectiveConfig();
 

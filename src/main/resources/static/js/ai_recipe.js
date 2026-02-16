@@ -214,6 +214,8 @@ async function generateRecipe() {
   }
 
   const chatBox = document.getElementById('chatHistory');
+  chatBox.innerHTML = '';
+
   const loadingId = 'loading-' + Date.now();
 
   // 清空初始提示
