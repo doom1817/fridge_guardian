@@ -44,6 +44,44 @@ public class AiApiController {
         userService.updateById(user);
         return Result.success();
     }
+    /**
+     * 新增接口 1: 获取用户的 AI 配置信息
+     * 用于前端判断用户是否已经配置过，以及回显配置
+     */
+    @GetMapping("/my-config")
+    public Result<Map<String, String>> getUserAiConfig() {
+        Long userId = UserContext.getUserId();
+        User user = userService.getById(userId);
+
+        if (user.getAiConfig() == null || user.getAiConfig().isEmpty()) {
+            return Result.success(null); // 返回空，前端据此判断是否弹出配置框
+        }
+
+        // 将 JSON 字符串转为 Map 返回给前端
+        Map<String, String> config = JSON.parseObject(user.getAiConfig(), Map.class);
+        // 为了安全，可以对 apiKey 做脱敏处理，或者直接返回（视安全性要求而定）
+        return Result.success(config);
+    }
+    /**
+     * 新增接口 2: 保存用户的 AI 配置
+     */
+    @PostMapping("/config")
+    public Result<Void> saveUserAiConfig(@RequestBody Map<String, String> config) {
+        Long userId = UserContext.getUserId();
+        User user = userService.getById(userId);
+
+        // 简单的参数校验
+        if (!config.containsKey("apiKey") || !config.containsKey("baseUrl") || !config.containsKey("model")) {
+            return Result.error("配置参数不完整");
+        }
+
+        // 序列化为 JSON 字符串存储
+        user.setAiConfig(JSON.toJSONString(config));
+        userService.updateById(user);
+
+        return Result.success();
+    }
+
     @GetMapping("/statistics")
     public Result<Map<String, Object>> getStatistics() {
         Long userId = UserContext.getUserId();
