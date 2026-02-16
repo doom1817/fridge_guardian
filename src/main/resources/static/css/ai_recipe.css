@@ -1,104 +1,127 @@
-/* 自定义滚动条 */
-.custom-scrollbar::-webkit-scrollbar { width: 6px; }
-.custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-.custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.1); border-radius: 10px; }
+/* === 全局基础设置 === */
+body {
+  background-color: #f8f9fa; /* 浅灰背景，突出白色卡片 */
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
 
-/* 复选框样式优化 */
-.custom-check {
-  padding: 10px 25px;
-  border-radius: 12px;
-  transition: background 0.2s;
+/* === 滚动条美化 (Webkit内核) === */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* === 通用工具类 === */
+.cursor-pointer {
   cursor: pointer;
 }
-.custom-check:hover { background: rgba(255,255,255,0.5); }
-.custom-check .form-check-input { cursor: pointer; border-color: #a29bfe; width: 1.2em; height: 1.2em; margin-top: 0.1em; }
-.custom-check .form-check-input:checked { background-color: #6c5ce7; border-color: #6c5ce7; }
 
-/* 聊天区域 */
-.chat-content { background: #f8f9fa; scroll-behavior: smooth; }
+/* 按钮微交互：悬停时上浮并增加阴影 */
+.transition-btn {
+  transition: all 0.3s ease;
+}
 
-/* 消息气泡 */
-.message-row { display: flex; margin-bottom: 20px; animation: slideUp 0.3s ease; }
-.message-row.user { justify-content: flex-end; }
-.message-row.ai { justify-content: flex-start; }
+.transition-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(13, 110, 253, 0.25) !important; /* Bootstrap Primary 蓝色的阴影 */
+}
 
-.bubble {
-  max-width: 85%;
-  padding: 16px 20px;
-  border-radius: 18px;
-  font-size: 0.95rem;
+/* === 食材列表区域 === */
+#foodList .list-group-item {
+  border-left: 3px solid transparent;
+  transition: background-color 0.2s, border-left-color 0.2s;
+}
+
+/* 选中或悬停时的效果 */
+#foodList .list-group-item:hover {
+  background-color: #f8f9fa;
+}
+
+/* 选中状态（如果通过JS添加了active类，虽然目前是checkbox控制，但预留样式） */
+#foodList .list-group-item.active-item {
+  background-color: #e7f1ff;
+  border-left-color: #0d6efd;
+}
+
+/* === AI 聊天区域 === */
+#chatHistory {
+  /* 聊天背景纹理 (可选) */
+  background-image: radial-gradient(#e9ecef 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+
+/* 聊天气泡内的 Markdown 样式优化 */
+#chatHistory div.p-3 {
   line-height: 1.6;
-  position: relative;
-  box-shadow: 0 2px 5px rgba(0,0,0,0.03);
+  font-size: 0.95rem;
 }
 
-.bubble.ai {
-  background: white;
-  color: #2d3436;
-  border-top-left-radius: 4px; /* 气泡尖角 */
+/* 气泡内的标题 */
+#chatHistory h3, #chatHistory h4, #chatHistory h5 {
+  font-weight: 700;
+  margin-top: 10px;
+  margin-bottom: 8px;
+  font-size: 1.1rem;
 }
 
-.bubble.user {
-  background: #6c5ce7;
-  color: white;
-  border-top-right-radius: 4px; /* 气泡尖角 */
-  box-shadow: 0 4px 15px rgba(108, 92, 231, 0.2);
+/* 气泡内的列表紧凑化 */
+#chatHistory ul, #chatHistory ol {
+  padding-left: 1.2rem;
+  margin-bottom: 0.5rem;
 }
 
-/* Markdown 内容样式 */
-.bubble.ai h3 { font-size: 1.1rem; font-weight: 700; margin-top: 10px; margin-bottom: 8px; color: #6c5ce7; }
-.bubble.ai ul, .bubble.ai ol { padding-left: 20px; margin-bottom: 10px; }
-.bubble.ai li { margin-bottom: 4px; }
-.bubble.ai strong { color: #0984e3; }
-
-/* 输入框区域 */
-.chat-footer {
-  box-shadow: 0 -5px 20px rgba(0,0,0,0.03);
-}
-.chat-footer input:focus {
-  box-shadow: 0 0 0 4px rgba(108, 92, 231, 0.1);
-  background: white !important;
+#chatHistory li {
+  margin-bottom: 4px;
 }
 
-/* 头像 */
-.avatar-circle {
-  width: 40px; height: 40px;
-  border-radius: 50%;
-  display: flex; align-items: center; justify-content: center;
-}
-.bg-gradient-primary { background: linear-gradient(135deg, #6c5ce7, #a29bfe); }
-
-/* 动画 */
-@keyframes slideUp {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
+/* 气泡内最后一个元素去除下边距 */
+#chatHistory *:last-child {
+  margin-bottom: 0;
 }
 
-/* 按钮禁用态 */
-button:disabled { opacity: 0.6; cursor: not-allowed; }
+/* 区分用户和 AI 的气泡细节 */
+/* 用户的气泡 (蓝色背景) */
+#chatHistory .bg-primary {
+  background: linear-gradient(135deg, #0d6efd, #0a58ca); /* 渐变蓝 */
+  border-bottom-right-radius: 4px !important; /* 调整圆角使其更有对话感 */
+}
 
-/* === 新增：美化确认弹窗 (Modal) === */
-.custom-modal-overlay {
-  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-  background: rgba(0,0,0,0.4); backdrop-filter: blur(4px); z-index: 10000;
-  display: none; justify-content: center; align-items: center;
-  animation: fadeIn 0.2s ease-out;
+/* AI 的气泡 (白色背景) */
+#chatHistory .bg-white {
+  border-bottom-left-radius: 4px !important;
+  border-color: #e9ecef !important;
 }
-.custom-modal {
-  background: white; width: 90%; max-width: 400px; border-radius: 20px; padding: 30px;
-  text-align: center; box-shadow: 0 15px 40px rgba(0,0,0,0.2);
-  animation: popIn 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.28);
-}
-.modal-icon {
-  width: 60px; height: 60px; background: #e0f7fa; color: #00cec9; border-radius: 50%;
-  display: flex; align-items: center; justify-content: center; font-size: 1.8rem; margin: 0 auto 20px;
-}
-.modal-btns { display: flex; justify-content: center; gap: 15px; margin-top: 25px; }
-.btn-modal { padding: 10px 25px; border-radius: 10px; border: none; font-weight: 600; cursor: pointer; transition: 0.2s; }
-.btn-modal-cancel { background: #f1f2f6; color: #636e72; }
-.btn-modal-cancel:hover { background: #dfe4ea; }
-.btn-modal-confirm { background: #6c5ce7; color: white; }
-.btn-modal-confirm:hover { background: #a29bfe; }
 
-@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-@keyframes popIn { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+/* 加载动画容器 */
+#chatHistory .spinner-grow {
+  width: 2rem;
+  height: 2rem;
+}
+
+/* === 模态框美化 === */
+.modal-content {
+  border-radius: 16px; /* 更大的圆角 */
+}
+
+.modal-header {
+  border-top-left-radius: 16px;
+  border-top-right-radius: 16px;
+}
+
+/* 输入框聚焦时的光晕调整 */
+.form-control:focus, .form-select:focus {
+  box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.15);
+  border-color: #86b7fe;
+}
