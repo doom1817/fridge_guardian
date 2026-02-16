@@ -3,6 +3,7 @@ package com.doom.fg.service.impl;
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONObject;
 import com.doom.fg.context.UserContext;
+import com.doom.fg.entity.AiApiLog;
 import com.doom.fg.entity.FoodItem;
 import com.doom.fg.entity.RecipeRecord;
 import com.doom.fg.entity.User;
@@ -166,11 +167,40 @@ public class AiServiceImpl implements AiService {
                 "3. 用户的调整只能通过调整调料、烹饪方式实现。\n" +
                 "4. 如果要求无法实现（如只有鸡蛋要求做肉），请礼貌拒绝并解释。";
 
+        // 1. 记录开始时间
+        long startTime = System.currentTimeMillis();
         // 5. 调用适配器 (解决参数不匹配问题，传入6个参数)
         String aiReply = aiEngine.chat(config.getApiKey(), config.getBaseUrl(), config.getModel(), systemPrompt, history, userMessage);
+        // 3. 记录结束时间并计算耗时
+        long endTime = System.currentTimeMillis();
+        long latency = endTime - startTime;
+        // 4. 【新增】构建日志实体并保存到数据库
+        AiApiLog log = new AiApiLog();
+        log.setUserId(userId);
+        log.setModel(config.getModel());
+        log.setRequestType("CHAT");
+        log.setLatencyMs(latency);
+// 判断是否成功 (根据你的 OpenAiCompatibleEngine，失败会返回 "Error:")
+        boolean isSuccess = aiReply != null && !aiReply.startsWith("Error");
+        log.setIsSuccess(isSuccess ? 1 : 0);
 
-        // 6. 维护对话滑动窗口
-        if (aiReply != null && !aiReply.startsWith("Error")) {
+        if (!isSuccess) {
+            log.setErrorMsg(aiReply); // 记录错误信息
+        }
+
+        // 简易估算 Token (为了让图表有数据)
+        // 真实项目中应该解析 API 返回的 usage 字段，但目前接口不支持，先估算
+        int promptLen = userMessage.length() + systemPrompt.length();
+        int replyLen = aiReply != null ? aiReply.length() : 0;
+        log.setPromptTokens(promptLen);
+        log.setCompletionTokens(replyLen);
+        log.setTotalTokens(promptLen + replyLen);
+
+        // 插入数据库！
+        aiApiLogMapper.insert(log);
+
+        // 5. 维护对话滑动窗口 (原有代码)
+        if (isSuccess) {
             saveToRedis(redisKey, new AiMessage("user", userMessage));
             saveToRedis(redisKey, new AiMessage("assistant", aiReply));
         }

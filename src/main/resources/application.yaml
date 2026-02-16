@@ -74,8 +74,8 @@ logging:
     org.springframework.web: info
     org.springframework.web.servlet.resource: warn
 
-# AI 配置
+# AI 系统配置，用来保底的
 ai:
-  api-key: sk-1f7adfd6ef99498599bf9edd01d0118c
+  api-key: {api-key}
   api-url: https://api.deepseek.com/chat/completions
   model: deepseek-chat
