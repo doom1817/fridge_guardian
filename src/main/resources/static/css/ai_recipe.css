@@ -1,10 +1,100 @@
-/* === 全局基础设置 === */
-body {
-  background-color: #f8f9fa; /* 浅灰背景，突出白色卡片 */
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+/* === 继承并增强全局样式 === */
+
+/* 1. 食材列表区域优化 */
+#foodList {
+  /* 配合 glass-card 的圆角 */
+  border-radius: 0 0 12px 12px;
 }
 
-/* === 滚动条美化 (Webkit内核) === */
+.list-group-item {
+  transition: all 0.2s ease;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.3) !important; /* 极细的分隔线 */
+}
+
+/* 悬停时微微发光并右移，增加交互感 */
+.list-group-item:hover {
+  background: rgba(255, 255, 255, 0.4) !important;
+  transform: translateX(4px);
+}
+
+/* 选中状态（复选框选中时 JS 可添加此类，或者依赖默认样式） */
+.list-group-item input:checked + label {
+  color: var(--primary-color);
+  font-weight: 700 !important;
+}
+
+/* 2. 聊天记录区域优化 */
+#chatHistory {
+  /* 增加磨砂质感，提升文字在动态背景上的可读性 */
+  background: rgba(255, 255, 255, 0.25);
+  backdrop-filter: blur(8px);
+  scroll-behavior: smooth;
+  border-radius: 12px;
+}
+
+/* === Markdown 排版精修 (核心部分) === */
+/* AI 生成的食谱通常包含标题、列表和加粗文本，这里进行专门优化 */
+
+/* 气泡内的文本行高 */
+#chatHistory div.p-3 {
+  line-height: 1.7;
+  font-size: 0.95rem;
+  word-break: break-word; /* 防止长单词撑破布局 */
+}
+
+/* 标题样式 (Markdown H1-H3) */
+#chatHistory h3,
+#chatHistory h4,
+#chatHistory h5 {
+  font-size: 1.15rem;
+  font-weight: 700;
+  margin-top: 12px;
+  margin-bottom: 8px;
+  padding-bottom: 4px;
+  border-bottom: 1px dashed rgba(0,0,0,0.1); /* 虚线分割，更有清单感 */
+}
+
+/* 用户气泡内的标题去除边框，颜色反白 */
+.bg-gradient-blue h3,
+.bg-gradient-blue h4,
+.bg-gradient-blue h5 {
+  border-bottom: none;
+  color: #fff !important;
+}
+
+/* 列表样式 (Markdown ul/ol) */
+#chatHistory ul,
+#chatHistory ol {
+  padding-left: 1.4rem;
+  margin-bottom: 10px;
+}
+
+#chatHistory li {
+  margin-bottom: 4px;
+}
+
+#chatHistory li::marker {
+  color: rgba(0, 0, 0, 0.5); /* 列表前的点颜色变浅 */
+}
+.bg-gradient-blue li::marker {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+/* 强调文本 (Markdown bold) */
+#chatHistory strong {
+  color: #2d3436;
+  font-weight: 700;
+}
+.bg-gradient-blue strong {
+  color: #fff;
+}
+
+/* 去除最后一个元素的下边距，防止气泡底部留白过多 */
+#chatHistory *:last-child {
+  margin-bottom: 0;
+}
+
+/* === 滚动条美化 (覆盖默认样式) === */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -15,113 +105,38 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-  border-radius: 3px;
+  background: rgba(162, 155, 254, 0.4); /* 与主色调一致的淡紫色 */
+  border-radius: 10px;
+  transition: background 0.3s;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+  background: rgba(108, 92, 231, 0.8); /* 深紫色 */
 }
 
-/* === 通用工具类 === */
-.cursor-pointer {
-  cursor: pointer;
+/* === 加载动画微调 === */
+.spinner-grow {
+  animation-duration: 1s; /* 加快一点闪烁速度 */
 }
 
-/* 按钮微交互：悬停时上浮并增加阴影 */
-.transition-btn {
-  transition: all 0.3s ease;
-}
-
-.transition-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(13, 110, 253, 0.25) !important; /* Bootstrap Primary 蓝色的阴影 */
-}
-
-/* === 食材列表区域 === */
-#foodList .list-group-item {
-  border-left: 3px solid transparent;
-  transition: background-color 0.2s, border-left-color 0.2s;
-}
-
-/* 选中或悬停时的效果 */
-#foodList .list-group-item:hover {
+/* === 输入框区域 === */
+#inputArea input:focus {
+  box-shadow: none; /* 去除 Bootstrap 默认的蓝色光晕，保持简洁 */
   background-color: #f8f9fa;
 }
 
-/* 选中状态（如果通过JS添加了active类，虽然目前是checkbox控制，但预留样式） */
-#foodList .list-group-item.active-item {
-  background-color: #e7f1ff;
-  border-left-color: #0d6efd;
+/* === 动画效果补充 === */
+@keyframes slideInUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
-/* === AI 聊天区域 === */
-#chatHistory {
-  /* 聊天背景纹理 (可选) */
-  background-image: radial-gradient(#e9ecef 1px, transparent 1px);
-  background-size: 20px 20px;
-}
-
-/* 聊天气泡内的 Markdown 样式优化 */
-#chatHistory div.p-3 {
-  line-height: 1.6;
-  font-size: 0.95rem;
-}
-
-/* 气泡内的标题 */
-#chatHistory h3, #chatHistory h4, #chatHistory h5 {
-  font-weight: 700;
-  margin-top: 10px;
-  margin-bottom: 8px;
-  font-size: 1.1rem;
-}
-
-/* 气泡内的列表紧凑化 */
-#chatHistory ul, #chatHistory ol {
-  padding-left: 1.2rem;
-  margin-bottom: 0.5rem;
-}
-
-#chatHistory li {
-  margin-bottom: 4px;
-}
-
-/* 气泡内最后一个元素去除下边距 */
-#chatHistory *:last-child {
-  margin-bottom: 0;
-}
-
-/* 区分用户和 AI 的气泡细节 */
-/* 用户的气泡 (蓝色背景) */
-#chatHistory .bg-primary {
-  background: linear-gradient(135deg, #0d6efd, #0a58ca); /* 渐变蓝 */
-  border-bottom-right-radius: 4px !important; /* 调整圆角使其更有对话感 */
-}
-
-/* AI 的气泡 (白色背景) */
-#chatHistory .bg-white {
-  border-bottom-left-radius: 4px !important;
-  border-color: #e9ecef !important;
-}
-
-/* 加载动画容器 */
-#chatHistory .spinner-grow {
-  width: 2rem;
-  height: 2rem;
-}
-
-/* === 模态框美化 === */
-.modal-content {
-  border-radius: 16px; /* 更大的圆角 */
-}
-
-.modal-header {
-  border-top-left-radius: 16px;
-  border-top-right-radius: 16px;
-}
-
-/* 输入框聚焦时的光晕调整 */
-.form-control:focus, .form-select:focus {
-  box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.15);
-  border-color: #86b7fe;
+.animate-enter {
+  animation: slideInUp 0.4s ease-out forwards;
 }

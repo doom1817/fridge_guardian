@@ -13,36 +13,117 @@ const ENGINE_DEFAULTS = {
 document.addEventListener('DOMContentLoaded', () => {
   configModal = new bootstrap.Modal(document.getElementById('aiConfigModal'));
 
-  // 1. 加载食材列表
+  // 1. 加载食材列表 (修复了这里)
   loadFoodList();
 
-  // 2. 检查用户是否已配置 AI (核心逻辑)
+  // 2. 检查配置
   checkConfigStatus();
 
-  // 绑定搜索事件
-  document.getElementById('foodSearch').addEventListener('input', (e) => filterFoods(e.target.value));
+  // 绑定搜索
+  const searchInput = document.getElementById('foodSearch');
+  if (searchInput) {
+    searchInput.addEventListener('input', (e) => filterFoods(e.target.value));
+  }
 });
 
-// === 配置相关逻辑 ===
+// === 业务逻辑 ===
+
+async function loadFoodList() {
+  const container = document.getElementById('foodList');
+
+  try {
+    const res = await fetch('/api/food/list');
+    // 增加网络层面的错误处理
+    if (!res.ok) {
+      throw new Error(`HTTP Error: ${res.status}`);
+    }
+
+    const result = await res.json();
+
+    if (result.code === 200) {
+      // 如果数据为空，显示空状态
+      if (!result.data || result.data.length === 0) {
+        container.innerHTML = `
+                    <div class="text-center py-4 text-muted">
+                        <i class="bi bi-box2 display-6 opacity-50"></i>
+                        <p class="mt-2 small">冰箱空空如也<br>去<a href="/food/add-page">录入食材</a>吧</p>
+                    </div>
+                `;
+      } else {
+        renderFoods(result.data);
+      }
+    } else {
+      // 处理业务错误 (如未登录)
+      console.error("加载食材失败:", result);
+      container.innerHTML = `
+                <div class="text-center py-4 text-danger">
+                    <i class="bi bi-exclamation-circle mb-2"></i>
+                    <p class="small">${result.message || '加载失败'}</p>
+                </div>
+            `;
+    }
+  } catch (e) {
+    console.error("请求异常:", e);
+    container.innerHTML = `
+            <div class="text-center py-4 text-danger">
+                <i class="bi bi-wifi-off mb-2"></i>
+                <p class="small">网络请求错误</p>
+            </div>
+        `;
+  }
+}
+
+function renderFoods(foods) {
+  const container = document.getElementById('foodList');
+  container.innerHTML = '';
+
+  foods.forEach(food => {
+    const item = document.createElement('div');
+    // 样式适配 Glass UI
+    item.className = 'list-group-item bg-transparent border-0 border-bottom d-flex justify-content-between align-items-center py-3 px-2';
+    item.innerHTML = `
+            <div class="form-check m-0">
+                <input class="form-check-input cursor-pointer" type="checkbox" value="${food.id}" 
+                       id="check-${food.id}"
+                       onchange="toggleFood(this, '${food.name}')">
+                <label class="form-check-label cursor-pointer ms-2 fw-medium text-dark" for="check-${food.id}">
+                    ${food.name}
+                </label>
+            </div>
+            <span class="badge bg-white text-dark shadow-sm border rounded-pill px-3">
+                ${food.quantity} ${food.unit}
+            </span>
+        `;
+    container.appendChild(item);
+  });
+}
+
+function toggleFood(checkbox, name) {
+  if (checkbox.checked) {
+    selectedFoodIds.add(parseInt(checkbox.value));
+  } else {
+    selectedFoodIds.delete(parseInt(checkbox.value));
+  }
+}
+
+// === 下面保持原有的 AI 和配置逻辑不变 ===
 
 async function checkConfigStatus() {
   try {
     const res = await fetch('/api/ai/my-config');
-    const data = await res.json();
-
-    if (data.code === 200) {
-      if (!data.data) {
-        // 未配置：填充默认值并弹窗
-        updateDefaultConfig();
-        // 稍微延迟弹出，体验更好
-        setTimeout(() => configModal.show(), 500);
-      } else {
-        // 已配置：回显到表单（方便用户修改）
-        fillConfigForm(data.data);
+    if(res.ok) {
+      const data = await res.json();
+      if (data.code === 200) {
+        if (!data.data) {
+          updateDefaultConfig();
+          setTimeout(() => configModal.show(), 800);
+        } else {
+          fillConfigForm(data.data);
+        }
       }
     }
   } catch (e) {
-    console.error("配置检查失败", e);
+    console.warn("AI 配置检查跳过", e);
   }
 }
 
@@ -50,11 +131,15 @@ function fillConfigForm(config) {
   document.getElementById('config-key').value = config.apiKey || '';
   document.getElementById('config-url').value = config.baseUrl || '';
   document.getElementById('config-model').value = config.model || '';
-  // 简单反推厂商逻辑（可选）
-  if(config.baseUrl && config.baseUrl.includes('deepseek')) document.getElementById('config-engine').value = 'DeepSeek';
-  else if(config.baseUrl && config.baseUrl.includes('aliyun')) document.getElementById('config-engine').value = 'Qwen';
-  else if(config.baseUrl && config.baseUrl.includes('openai')) document.getElementById('config-engine').value = 'OpenAI';
-  else document.getElementById('config-engine').value = 'Custom';
+
+  // 反推厂商
+  const url = (config.baseUrl || '').toLowerCase();
+  const select = document.getElementById('config-engine');
+
+  if(url.includes('deepseek')) select.value = 'DeepSeek';
+  else if(url.includes('aliyun') || url.includes('dashscope')) select.value = 'Qwen';
+  else if(url.includes('openai')) select.value = 'OpenAI';
+  else select.value = 'Custom';
 }
 
 function updateDefaultConfig() {
@@ -67,7 +152,7 @@ function updateDefaultConfig() {
 }
 
 function openConfigModal() {
-  checkConfigStatus().then(() => configModal.show());
+  configModal.show();
 }
 
 async function saveAiConfig() {
@@ -82,13 +167,13 @@ async function saveAiConfig() {
     return;
   }
 
-  const btn = document.querySelector('#aiConfigModal .btn-primary');
+  const btn = document.querySelector('#configForm button');
   const originalText = btn.innerHTML;
-  btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> 保存中...';
+  btn.innerHTML = '保存中...';
   btn.disabled = true;
 
   try {
-    const res = await fetch('/api/ai/config', { // 使用你新增的 /config 接口
+    const res = await fetch('/api/ai/config', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(config)
@@ -97,7 +182,8 @@ async function saveAiConfig() {
 
     if (data.code === 200) {
       configModal.hide();
-      showToast("配置保存成功", "success");
+      // 简单的 Toast 提示
+      alert("配置已保存！");
     } else {
       alert(data.message || "保存失败");
     }
@@ -109,63 +195,28 @@ async function saveAiConfig() {
   }
 }
 
-// === 业务逻辑 ===
-
-async function loadFoodList() {
-  // 模拟从后端获取 (复用之前的逻辑)
-  // 这里为了演示，假设调用后端 /api/food/list
-  try {
-    const res = await fetch('/api/food/list');
-    const result = await res.json();
-    if (result.code === 200) {
-      renderFoods(result.data);
-    }
-  } catch (e) {
-    document.getElementById('foodList').innerHTML = '<div class="text-danger p-3">加载失败</div>';
-  }
-}
-
-function renderFoods(foods) {
-  const container = document.getElementById('foodList');
-  container.innerHTML = '';
-
-  foods.forEach(food => {
-    const item = document.createElement('label');
-    item.className = 'list-group-item list-group-item-action d-flex justify-content-between align-items-center cursor-pointer';
-    item.innerHTML = `
-            <div>
-                <input class="form-check-input me-2" type="checkbox" value="${food.id}" 
-                       onchange="toggleFood(this, '${food.name}')">
-                <span>${food.name}</span>
-            </div>
-            <span class="badge bg-light text-dark rounded-pill border">${food.quantity} ${food.unit}</span>
-        `;
-    container.appendChild(item);
-  });
-}
-
-function toggleFood(checkbox, name) {
-  if (checkbox.checked) {
-    selectedFoodIds.add(parseInt(checkbox.value));
-  } else {
-    selectedFoodIds.delete(parseInt(checkbox.value));
-  }
-}
-
 async function generateRecipe() {
   if (selectedFoodIds.size === 0) {
-    alert("请至少选择一种食材！");
+    alert("请先在左侧列表选择至少一种食材！");
     return;
   }
 
-  // UI Loading 状态
   const chatBox = document.getElementById('chatHistory');
-  chatBox.innerHTML = `
-        <div class="text-center mt-5">
-            <div class="spinner-grow text-primary" role="status"></div>
-            <p class="mt-2 text-muted">AI 正在思考食谱... (可能需要10-20秒)</p>
+  // 添加 loading 气泡
+  const loadingId = 'loading-' + Date.now();
+  const loadingHtml = `
+        <div id="${loadingId}" class="d-flex mb-3 justify-content-start animate-enter">
+            <div class="p-3 rounded-3 shadow-sm bg-white border">
+                <div class="spinner-grow spinner-grow-sm text-primary" role="status"></div>
+                <span class="ms-2 small text-muted">AI 正在根据您的食材构思食谱...</span>
+            </div>
         </div>
     `;
+
+  // 如果是第一次对话，清空初始提示
+  if (chatBox.querySelector('.text-center')) chatBox.innerHTML = '';
+  chatBox.insertAdjacentHTML('beforeend', loadingHtml);
+  chatBox.scrollTop = chatBox.scrollHeight;
 
   try {
     const res = await fetch('/api/ai/generate-recipe', {
@@ -175,20 +226,22 @@ async function generateRecipe() {
     });
     const data = await res.json();
 
+    // 移除 loading
+    const loadingEl = document.getElementById(loadingId);
+    if(loadingEl) loadingEl.remove();
+
     if (data.code === 200) {
-      // 显示结果
       appendMessage('assistant', data.data.content);
       document.getElementById('inputArea').style.display = 'block';
-    } else if (data.message === "AI_CONFIG_MISSING" || data.code === 500) {
-      // 后端抛出异常时的处理
-      chatBox.innerHTML = ''; // 清空 loading
+    } else if (data.message === "AI_CONFIG_MISSING") {
       alert("请先配置 AI 模型信息！");
       configModal.show();
     } else {
-      chatBox.innerHTML = `<div class="alert alert-danger mx-3">${data.message}</div>`;
+      appendMessage('assistant', `⚠️ 抱歉，生成失败：${data.message}`);
     }
   } catch (e) {
-    chatBox.innerHTML = `<div class="alert alert-danger mx-3">请求出错: ${e.message}</div>`;
+    document.getElementById(loadingId)?.remove();
+    appendMessage('assistant', `❌ 网络请求出错：${e.message}`);
   }
 }
 
@@ -199,7 +252,6 @@ async function sendMessage() {
 
   appendMessage('user', msg);
   input.value = '';
-  input.disabled = true;
 
   try {
     const res = await fetch('/api/ai/chat', {
@@ -212,29 +264,23 @@ async function sendMessage() {
     if (data.code === 200) {
       appendMessage('assistant', data.data);
     } else {
-      appendMessage('assistant', `❌ 错误: ${data.message}`);
+      appendMessage('assistant', `⚠️ 错误: ${data.message}`);
     }
   } catch (e) {
-    appendMessage('assistant', "❌ 网络错误，请重试");
-  } finally {
-    input.disabled = false;
-    input.focus();
+    appendMessage('assistant', "❌ 网络连接失败");
   }
 }
 
 function appendMessage(role, text) {
   const box = document.getElementById('chatHistory');
-  // 如果是第一条消息，清空初始提示
-  if (box.querySelector('.text-center')) box.innerHTML = '';
-
   const div = document.createElement('div');
-  div.className = `d-flex mb-3 ${role === 'user' ? 'justify-content-end' : 'justify-content-start'}`;
+  div.className = `d-flex mb-3 animate-enter ${role === 'user' ? 'justify-content-end' : 'justify-content-start'}`;
 
   const bubble = document.createElement('div');
-  bubble.className = `p-3 rounded-3 shadow-sm ${role === 'user' ? 'bg-primary text-white' : 'bg-white border'}`;
+  // AI 气泡白色，用户气泡使用渐变色
+  bubble.className = `p-3 rounded-3 shadow-sm ${role === 'user' ? 'bg-gradient-blue text-white' : 'bg-white border'}`;
   bubble.style.maxWidth = "85%";
 
-  // 使用 marked 解析 markdown，并允许换行
   bubble.innerHTML = role === 'user' ? text : marked.parse(text);
 
   div.appendChild(bubble);
@@ -243,27 +289,21 @@ function appendMessage(role, text) {
 }
 
 async function clearHistory() {
-  if(!confirm('确定要清除 AI 的上下文记忆吗？')) return;
+  if(!confirm('确定要清除当前的对话记忆吗？')) return;
   await fetch('/api/ai/clear-history', { method: 'POST' });
   document.getElementById('chatHistory').innerHTML = `
-        <div class="text-center text-muted mt-5">
-            <i class="bi bi-robot fs-1 d-block mb-3"></i>
-            <p>记忆已清除，请重新生成食谱</p>
+        <div class="text-center text-muted mt-5 opacity-75">
+            <i class="bi bi-stars fs-1 d-block mb-3 text-warning"></i>
+            <p>记忆已清除，准备好开启新的美味探索了！</p>
         </div>
     `;
   document.getElementById('inputArea').style.display = 'none';
 }
 
-function showToast(msg, type='info') {
-  // 简单实现，实际可用 bootstrap toast
-  alert(msg);
-}
-
-// 辅助筛选
 function filterFoods(keyword) {
   const items = document.querySelectorAll('#foodList .list-group-item');
   items.forEach(item => {
-    const text = item.querySelector('span').innerText.toLowerCase();
-    item.style.display = text.includes(keyword.toLowerCase()) ? '' : 'none';
+    const text = item.innerText.toLowerCase();
+    item.style.display = text.includes(keyword.toLowerCase()) ? 'flex' : 'none'; // 注意这里改为 flex
   });
 }
