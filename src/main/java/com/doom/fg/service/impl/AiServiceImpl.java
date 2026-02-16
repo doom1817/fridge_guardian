@@ -15,6 +15,8 @@ import com.doom.fg.util.OpenAiCompatibleEngine;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.util.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -27,7 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
-
+@Slf4j
 @Service
 public class AiServiceImpl implements AiService {
 
@@ -68,12 +70,6 @@ public class AiServiceImpl implements AiService {
 
     @Override
     public Map<String, String> getAiRecipe(List<Long> foodIds) {
-        JSONObject config = getUserAiConfig();
-        // 如果配置为空，此处可抛出自定义异常，通知前端弹出配置窗口
-        if (config == null) {
-            throw new RuntimeException("AI_CONFIG_MISSING");
-        }
-
         List<FoodItem> foodItems = foodItemService.listByIds(foodIds);
         List<String> foodNames = foodItems.stream()
                 .map(FoodItem::getName)
@@ -108,13 +104,11 @@ public class AiServiceImpl implements AiService {
     public String getRecipe(List<String> foods) {
         Long userId = UserContext.getUserId();
         User user = userService.getById(userId);
-        String redisKey = HISTORY_KEY_PREFIX + userId;
 
+        String redisKey = HISTORY_KEY_PREFIX + userId;
+        Boolean delete = redisTemplate.delete(redisKey);
         // 1. 获取配置路由 (解决变量缺失问题)
-        JSONObject config = JSON.parseObject(user.getAiConfig());
-        String currentKey = (config != null && config.containsKey("apiKey")) ? config.getString("apiKey") : defaultApiKey;
-        String currentUrl = (config != null && config.containsKey("baseUrl")) ? config.getString("baseUrl") : defaultApiUrl;
-        String currentModel = (config != null && config.containsKey("model")) ? config.getString("model") : defaultModel;
+        AiConfig config = getEffectiveConfig();
 
         // 2. 清理旧对话，构建新提示词
         redisTemplate.delete(redisKey);
@@ -130,7 +124,7 @@ public class AiServiceImpl implements AiService {
         String userPrompt = "我冰箱里有这些食材：" + foodList + "。请帮我设计一道美味的家常菜。";
 
         // 3. 调用适配器引擎 (解决参数不匹配问题，传入6个参数)
-        String aiReply = aiEngine.chat(currentKey, currentUrl, currentModel, systemPrompt, null, userPrompt);
+        String aiReply = aiEngine.chat(config.getApiKey(), config.getBaseUrl(), config.getModel(), systemPrompt, null, userPrompt);
 
         // 4. 构建初始记忆
         if (aiReply != null && !aiReply.startsWith("Error")) {
@@ -150,10 +144,7 @@ public class AiServiceImpl implements AiService {
         String redisKey = HISTORY_KEY_PREFIX + userId;
 
         // 1. 动态获取配置
-        JSONObject config = JSON.parseObject(user.getAiConfig());
-        String currentKey = (config != null && config.containsKey("apiKey")) ? config.getString("apiKey") : defaultApiKey;
-        String currentUrl = (config != null && config.containsKey("baseUrl")) ? config.getString("baseUrl") : defaultApiUrl;
-        String currentModel = (config != null && config.containsKey("model")) ? config.getString("model") : defaultModel;
+        AiConfig config = getEffectiveConfig();
 
         // 2. 获取历史记录
         List<AiMessage> history = getHistoryFromRedis(redisKey);
@@ -177,7 +168,7 @@ public class AiServiceImpl implements AiService {
                 "4. 如果要求无法实现（如只有鸡蛋要求做肉），请礼貌拒绝并解释。";
 
         // 5. 调用适配器 (解决参数不匹配问题，传入6个参数)
-        String aiReply = aiEngine.chat(currentKey, currentUrl, currentModel, systemPrompt, history, userMessage);
+        String aiReply = aiEngine.chat(config.getApiKey(), config.getBaseUrl(), config.getModel(), systemPrompt, history, userMessage);
 
         // 6. 维护对话滑动窗口
         if (aiReply != null && !aiReply.startsWith("Error")) {
@@ -186,15 +177,59 @@ public class AiServiceImpl implements AiService {
         }
         return aiReply;
     }
-    private JSONObject getUserAiConfig() {
+    /**
+     * 获取有效的 AI 配置 (用户配置优先 -> 系统配置兜底)
+     */
+    /**
+     * 获取有效的 AI 配置 (用户配置优先 -> 系统配置兜底)
+     */
+    private AiConfig getEffectiveConfig() {
         Long userId = UserContext.getUserId();
         User user = userService.getById(userId);
 
-        // 如果用户没有配置过 AI
-        if (user.getAiConfig() == null || user.getAiConfig().isEmpty()) {
-            return null;
+        // 默认值
+        String apiKey = defaultApiKey;
+        String baseUrl = defaultApiUrl;
+        String model = defaultModel;
+        boolean isCustom = false; // 标记是否使用了自定义配置
+
+        // 1. 尝试从用户个性化配置中覆盖
+        if (user != null && StringUtils.hasText(user.getAiConfig())) {
+            try {
+                JSONObject userConfig = JSON.parseObject(user.getAiConfig());
+                if (userConfig != null) {
+                    if (StringUtils.hasText(userConfig.getString("apiKey"))) {
+                        apiKey = userConfig.getString("apiKey");
+                        isCustom = true;
+                    }
+                    if (StringUtils.hasText(userConfig.getString("baseUrl"))) {
+                        baseUrl = userConfig.getString("baseUrl");
+                        isCustom = true;
+                    }
+                    if (StringUtils.hasText(userConfig.getString("model"))) {
+                        model = userConfig.getString("model");
+                        isCustom = true;
+                    }
+                }
+            } catch (Exception e) {
+                log.error("用户 {} AI配置解析失败，降级使用默认配置", userId, e);
+            }
         }
-        return JSON.parseObject(user.getAiConfig());
+
+        // 【日志核心点】打印当前使用的配置来源
+        if (isCustom) {
+            log.info(">>> 使用用户 [自定义] AI配置 | Model: {} | URL: {}", model, baseUrl);
+        } else {
+            log.info(">>> 使用系统 [默认] AI配置 | Model: {} | URL: {}", model, baseUrl);
+        }
+
+        // 2. 最终检查
+        if (!StringUtils.hasText(apiKey)) {
+            log.error("用户 {} 未配置AI，且系统无默认配置", userId);
+            throw new RuntimeException("AI_CONFIG_MISSING");
+        }
+
+        return new AiConfig(apiKey, baseUrl, model);
     }
     // --- 内部私有方法 (Redis维护) ---
     private List<AiMessage> getHistoryFromRedis(String key) {
@@ -227,5 +262,13 @@ public class AiServiceImpl implements AiService {
     public static class AiMessage implements Serializable {
         private String role;
         private String content;
+    }
+    @Data
+    @AllArgsConstructor
+    @NoArgsConstructor
+    private static class AiConfig {
+        private String apiKey;
+        private String baseUrl;
+        private String model;
     }
 }

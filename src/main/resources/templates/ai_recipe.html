@@ -43,11 +43,11 @@
 
 <nav class="navbar navbar-expand-lg fixed-top glass-nav">
   <div class="container">
-    <a class="navbar-brand fw-bold app-title mb-0" href="/index" style="font-size: 1.5rem;">
+    <a class="navbar-brand fw-bold app-title mb-0" href="/" style="font-size: 1.5rem;">
       <i class="bi bi-snow2 me-2"></i>冰箱守卫者
     </a>
     <div class="d-flex align-items-center gap-3">
-      <a href="/index" class="btn btn-sm btn-link text-decoration-none text-secondary fw-bold">
+      <a href="/" class="btn btn-sm btn-link text-decoration-none text-secondary fw-bold">
         <i class="bi bi-arrow-left"></i> 返回首页
       </a>
       <button class="btn btn-sm glass-pill border-0 shadow-sm text-primary fw-bold" onclick="openConfigModal()">
@@ -126,7 +126,7 @@
 
 <div class="modal fade" id="aiConfigModal" data-bs-backdrop="static" tabindex="-1">
   <div class="modal-dialog modal-dialog-centered">
-    <div class="glass-card p-0 border-0">
+    <div class="glass-card p-0 border-0" style="pointer-events: auto;">
       <div class="modal-header border-0 bg-gradient-blue text-white">
         <h5 class="modal-title fw-bold"><i class="bi bi-cpu me-2"></i>配置 AI 引擎</h5>
         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
@@ -135,7 +135,7 @@
         <form id="configForm">
           <div class="mb-3">
             <label class="small text-muted fw-bold mb-1">模型厂商</label>
-            <select class="form-select rounded-3" id="config-engine" onchange="updateDefaultConfig()">
+            <select class="form-select rounded-3 cursor-pointer" id="config-engine" onchange="updateDefaultConfig()">
               <option value="DeepSeek" selected>DeepSeek</option>
               <option value="Qwen">通义千问 (Qwen)</option>
               <option value="OpenAI">OpenAI (GPT-3.5/4)</option>

@@ -1,6 +1,13 @@
-// 全局变量
+// === 全局变量与配置 ===
 let selectedFoodIds = new Set();
 let configModal = null;
+
+// 1. 获取 Token (核心修复：如果没有 Token，直接跳回登录页)
+const token = localStorage.getItem("fg_token") || sessionStorage.getItem("fg_token");
+if (!token) {
+  alert("登录已过期，请重新登录");
+  window.location.href = "/login";
+}
 
 // 厂商默认配置字典
 const ENGINE_DEFAULTS = {
@@ -13,18 +20,38 @@ const ENGINE_DEFAULTS = {
 document.addEventListener('DOMContentLoaded', () => {
   configModal = new bootstrap.Modal(document.getElementById('aiConfigModal'));
 
-  // 1. 加载食材列表 (修复了这里)
+  // 2. 加载食材列表
   loadFoodList();
 
-  // 2. 检查配置
+  // 3. 检查配置
   checkConfigStatus();
 
-  // 绑定搜索
+  // 绑定搜索事件
   const searchInput = document.getElementById('foodSearch');
   if (searchInput) {
     searchInput.addEventListener('input', (e) => filterFoods(e.target.value));
   }
 });
+
+// === 通用 Fetch 封装 (自动带 Token) ===
+async function fetchWithAuth(url, options = {}) {
+  // 默认 Header
+  const headers = {
+    'Authorization': token,
+    ...options.headers // 合并用户传入的 header (如 Content-Type)
+  };
+
+  const res = await fetch(url, { ...options, headers });
+
+  // 处理 Token 过期
+  if (res.status === 401) {
+    alert("登录已过期，请重新登录");
+    localStorage.removeItem("fg_token");
+    window.location.href = "/login";
+    throw new Error("Unauthorized");
+  }
+  return res;
+}
 
 // === 业务逻辑 ===
 
@@ -32,16 +59,11 @@ async function loadFoodList() {
   const container = document.getElementById('foodList');
 
   try {
-    const res = await fetch('/api/food/list');
-    // 增加网络层面的错误处理
-    if (!res.ok) {
-      throw new Error(`HTTP Error: ${res.status}`);
-    }
-
+    // 使用 fetchWithAuth 替代 fetch
+    const res = await fetchWithAuth('/api/food/list');
     const result = await res.json();
 
     if (result.code === 200) {
-      // 如果数据为空，显示空状态
       if (!result.data || result.data.length === 0) {
         container.innerHTML = `
                     <div class="text-center py-4 text-muted">
@@ -53,23 +75,12 @@ async function loadFoodList() {
         renderFoods(result.data);
       }
     } else {
-      // 处理业务错误 (如未登录)
       console.error("加载食材失败:", result);
-      container.innerHTML = `
-                <div class="text-center py-4 text-danger">
-                    <i class="bi bi-exclamation-circle mb-2"></i>
-                    <p class="small">${result.message || '加载失败'}</p>
-                </div>
-            `;
+      container.innerHTML = `<div class="text-center py-4 text-danger small">${result.message || '加载失败'}</div>`;
     }
   } catch (e) {
     console.error("请求异常:", e);
-    container.innerHTML = `
-            <div class="text-center py-4 text-danger">
-                <i class="bi bi-wifi-off mb-2"></i>
-                <p class="small">网络请求错误</p>
-            </div>
-        `;
+    container.innerHTML = `<div class="text-center py-4 text-danger small">网络连接失败</div>`;
   }
 }
 
@@ -79,7 +90,6 @@ function renderFoods(foods) {
 
   foods.forEach(food => {
     const item = document.createElement('div');
-    // 样式适配 Glass UI
     item.className = 'list-group-item bg-transparent border-0 border-bottom d-flex justify-content-between align-items-center py-3 px-2';
     item.innerHTML = `
             <div class="form-check m-0">
@@ -91,7 +101,7 @@ function renderFoods(foods) {
                 </label>
             </div>
             <span class="badge bg-white text-dark shadow-sm border rounded-pill px-3">
-                ${food.quantity} ${food.unit}
+                ${food.quantity} ${food.unit || ''}
             </span>
         `;
     container.appendChild(item);
@@ -106,19 +116,21 @@ function toggleFood(checkbox, name) {
   }
 }
 
-// === 下面保持原有的 AI 和配置逻辑不变 ===
+// === AI 配置相关 ===
 
 async function checkConfigStatus() {
   try {
-    const res = await fetch('/api/ai/my-config');
+    const res = await fetchWithAuth('/api/ai/my-config');
     if(res.ok) {
-      const data = await res.json();
-      if (data.code === 200) {
-        if (!data.data) {
+      const result = await res.json();
+      if (result.code === 200) {
+        if (!result.data) {
+          // 未配置
           updateDefaultConfig();
           setTimeout(() => configModal.show(), 800);
         } else {
-          fillConfigForm(data.data);
+          // 已配置，回显
+          fillConfigForm(result.data);
         }
       }
     }
@@ -132,7 +144,6 @@ function fillConfigForm(config) {
   document.getElementById('config-url').value = config.baseUrl || '';
   document.getElementById('config-model').value = config.model || '';
 
-  // 反推厂商
   const url = (config.baseUrl || '').toLowerCase();
   const select = document.getElementById('config-engine');
 
@@ -173,19 +184,18 @@ async function saveAiConfig() {
   btn.disabled = true;
 
   try {
-    const res = await fetch('/api/ai/config', {
+    const res = await fetchWithAuth('/api/ai/config', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(config)
     });
-    const data = await res.json();
+    const result = await res.json();
 
-    if (data.code === 200) {
+    if (result.code === 200) {
       configModal.hide();
-      // 简单的 Toast 提示
       alert("配置已保存！");
     } else {
-      alert(data.message || "保存失败");
+      alert(result.message || "保存失败");
     }
   } catch (e) {
     alert("网络错误");
@@ -195,6 +205,8 @@ async function saveAiConfig() {
   }
 }
 
+// === 生成食谱与对话 ===
+
 async function generateRecipe() {
   if (selectedFoodIds.size === 0) {
     alert("请先在左侧列表选择至少一种食材！");
@@ -202,42 +214,40 @@ async function generateRecipe() {
   }
 
   const chatBox = document.getElementById('chatHistory');
-  // 添加 loading 气泡
   const loadingId = 'loading-' + Date.now();
+
+  // 清空初始提示
+  if (chatBox.querySelector('.text-center')) chatBox.innerHTML = '';
+
   const loadingHtml = `
         <div id="${loadingId}" class="d-flex mb-3 justify-content-start animate-enter">
             <div class="p-3 rounded-3 shadow-sm bg-white border">
                 <div class="spinner-grow spinner-grow-sm text-primary" role="status"></div>
-                <span class="ms-2 small text-muted">AI 正在根据您的食材构思食谱...</span>
+                <span class="ms-2 small text-muted">AI 正在构思食谱...</span>
             </div>
         </div>
     `;
-
-  // 如果是第一次对话，清空初始提示
-  if (chatBox.querySelector('.text-center')) chatBox.innerHTML = '';
   chatBox.insertAdjacentHTML('beforeend', loadingHtml);
   chatBox.scrollTop = chatBox.scrollHeight;
 
   try {
-    const res = await fetch('/api/ai/generate-recipe', {
+    const res = await fetchWithAuth('/api/ai/generate-recipe', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(Array.from(selectedFoodIds))
     });
-    const data = await res.json();
+    const result = await res.json();
 
-    // 移除 loading
-    const loadingEl = document.getElementById(loadingId);
-    if(loadingEl) loadingEl.remove();
+    document.getElementById(loadingId)?.remove();
 
-    if (data.code === 200) {
-      appendMessage('assistant', data.data.content);
+    if (result.code === 200) {
+      appendMessage('assistant', result.data.content); // 注意：这里根据后端返回结构可能需要调整，假设返回的是 ChatResponse 对象
       document.getElementById('inputArea').style.display = 'block';
-    } else if (data.message === "AI_CONFIG_MISSING") {
+    } else if (result.message === "AI_CONFIG_MISSING") {
       alert("请先配置 AI 模型信息！");
       configModal.show();
     } else {
-      appendMessage('assistant', `⚠️ 抱歉，生成失败：${data.message}`);
+      appendMessage('assistant', `⚠️ 生成失败：${result.message}`);
     }
   } catch (e) {
     document.getElementById(loadingId)?.remove();
@@ -254,17 +264,17 @@ async function sendMessage() {
   input.value = '';
 
   try {
-    const res = await fetch('/api/ai/chat', {
+    const res = await fetchWithAuth('/api/ai/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ message: msg })
     });
-    const data = await res.json();
+    const result = await res.json();
 
-    if (data.code === 200) {
-      appendMessage('assistant', data.data);
+    if (result.code === 200) {
+      appendMessage('assistant', result.data);
     } else {
-      appendMessage('assistant', `⚠️ 错误: ${data.message}`);
+      appendMessage('assistant', `⚠️ 错误: ${result.message}`);
     }
   } catch (e) {
     appendMessage('assistant', "❌ 网络连接失败");
@@ -277,10 +287,10 @@ function appendMessage(role, text) {
   div.className = `d-flex mb-3 animate-enter ${role === 'user' ? 'justify-content-end' : 'justify-content-start'}`;
 
   const bubble = document.createElement('div');
-  // AI 气泡白色，用户气泡使用渐变色
   bubble.className = `p-3 rounded-3 shadow-sm ${role === 'user' ? 'bg-gradient-blue text-white' : 'bg-white border'}`;
   bubble.style.maxWidth = "85%";
 
+  // 使用 marked 解析
   bubble.innerHTML = role === 'user' ? text : marked.parse(text);
 
   div.appendChild(bubble);
@@ -290,20 +300,25 @@ function appendMessage(role, text) {
 
 async function clearHistory() {
   if(!confirm('确定要清除当前的对话记忆吗？')) return;
-  await fetch('/api/ai/clear-history', { method: 'POST' });
-  document.getElementById('chatHistory').innerHTML = `
-        <div class="text-center text-muted mt-5 opacity-75">
-            <i class="bi bi-stars fs-1 d-block mb-3 text-warning"></i>
-            <p>记忆已清除，准备好开启新的美味探索了！</p>
-        </div>
-    `;
-  document.getElementById('inputArea').style.display = 'none';
+
+  try {
+    await fetchWithAuth('/api/ai/clear-history', { method: 'POST' });
+    document.getElementById('chatHistory').innerHTML = `
+            <div class="text-center text-muted mt-5 opacity-75">
+                <i class="bi bi-stars fs-1 d-block mb-3 text-warning"></i>
+                <p>记忆已清除，准备好开启新的美味探索了！</p>
+            </div>
+        `;
+    document.getElementById('inputArea').style.display = 'none';
+  } catch (e) {
+    alert("清除失败");
+  }
 }
 
 function filterFoods(keyword) {
   const items = document.querySelectorAll('#foodList .list-group-item');
   items.forEach(item => {
     const text = item.innerText.toLowerCase();
-    item.style.display = text.includes(keyword.toLowerCase()) ? 'flex' : 'none'; // 注意这里改为 flex
+    item.style.display = text.includes(keyword.toLowerCase()) ? 'flex' : 'none';
   });
 }
