@@ -76,6 +76,6 @@ logging:
 
 # AI 系统配置，用来保底的
 ai:
-  api-key: {api-key}
+  api-key: sk-1f7adfd6ef99498599bf9edd01d0118c
   api-url: https://api.deepseek.com/chat/completions
   model: deepseek-chat

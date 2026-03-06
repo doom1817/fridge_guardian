@@ -52,7 +52,6 @@ public class AiServiceImpl implements AiService {
     @Autowired
     private UserService userService;
 
-    // 解决错误2：从 application.yaml 读取兜底默认配置
     @Value("${ai.api-key}")
     private String defaultApiKey;
 
@@ -206,9 +205,7 @@ public class AiServiceImpl implements AiService {
         }
         return aiReply;
     }
-    /**
-     * 获取有效的 AI 配置 (用户配置优先 -> 系统配置兜底)
-     */
+
     /**
      * 获取有效的 AI 配置 (用户配置优先 -> 系统配置兜底)
      */

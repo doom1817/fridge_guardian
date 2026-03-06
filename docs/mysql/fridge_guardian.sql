@@ -89,9 +89,9 @@ CREATE TABLE `ai_api_log` (
 -- 数据初始化 (基准日期: 2026-02-16)
 -- ==================================================
 
--- 1. 插入测试用户 (密码: 123456)
+-- 1. 插入测试用户 (密码: 123456) BCryptPasswordEncoder
 INSERT INTO `user` (username, password, email, ai_config) VALUES
-    ('admin', '123456', 'dp_dev@example.com', '{"engineType":"DIFY","apiKey":"sk-1f7adfd6ef99498599bf9edd01d0118c","baseUrl":"http://192.168.6.132:8100/v1"}');
+    ('admin', '$2a$10$yoXh/gIVkY7tHbnfGJXLAuY8HHCGc1X1JdA.JMzrhMcJeryELNCiq', 'admin@example.com', '{"engineType":"DIFY","apiKey":"sk-1f7adfd6ef99498599bf9edd01d0118c","baseUrl":"http://192.168.6.132:8100/v1"}');
 
 -- 2. 插入食材分类
 INSERT INTO `category` (name, default_expiry_days, icon) VALUES
