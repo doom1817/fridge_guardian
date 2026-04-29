@@ -4,16 +4,17 @@ import com.doom.fg.common.Result;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
-/**
- * Created with IntelliJ IDEA.
- *
- * @Author: doom
- * @Date: 2026/01/21/17:11
- * @Description:
- *  如果 AI 接口断开或数据库报错，目前前端会直接看到 500 错误。
- */
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+    @ExceptionHandler(AiException.class)
+    public Result<String> handleAiException(AiException e) {
+        Result<String> result = new Result<>();
+        result.setCode(500);
+        result.setMessage(e.getErrorCode());
+        result.setData(e.getUserMessage());
+        return result;
+    }
+
     @ExceptionHandler(Exception.class)
     public Result<String> handleException(Exception e) {
         e.printStackTrace();

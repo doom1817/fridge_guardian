@@ -1,16 +1,14 @@
 package com.doom.fg.entity;
-import com.baomidou.mybatisplus.annotation.*;
+
+import com.baomidou.mybatisplus.annotation.FieldFill;
+import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 
 import java.time.LocalDateTime;
 
-/**
- * Created with IntelliJ IDEA.
- *
- * @Author: doom
- * @Date: 2026/02/09/16:24
- * @Description:
- */
 @Data
 @TableName("ai_api_log")
 public class AiApiLog {
@@ -20,14 +18,18 @@ public class AiApiLog {
     private Long userId;
     private String model;
     private String requestType;
+    private String promptVersion;
+    private String scenarioType;
 
     private Integer promptTokens = 0;
     private Integer completionTokens = 0;
     private Integer totalTokens = 0;
+    private Integer foodCount = 0;
 
     private Long latencyMs;
     private Integer statusCode;
-    private Integer isSuccess; // 1成功 0失败
+    private Integer isSuccess;
+    private String errorType;
     private String errorMsg;
 
     @TableField(fill = FieldFill.INSERT)

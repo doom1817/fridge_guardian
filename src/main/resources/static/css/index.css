@@ -236,3 +236,172 @@ body {
     transform: translateY(0);
   }
 }
+
+.global-expiring-alert {
+  position: fixed;
+  top: 18px;
+  left: 18px;
+  z-index: 1100;
+  width: min(320px, calc(100vw - 32px));
+}
+
+.global-expiring-trigger {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) auto;
+  gap: 0.75rem;
+  align-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  border-radius: 18px;
+  padding: 0.85rem 0.95rem;
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(18px);
+  box-shadow: 0 16px 32px rgba(15, 23, 42, 0.12);
+  text-align: left;
+  color: #1f2937;
+}
+
+.global-expiring-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  background: linear-gradient(135deg, #f59e0b, #ef4444);
+  box-shadow: 0 12px 24px rgba(239, 68, 68, 0.22);
+}
+
+.global-expiring-copy {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.global-expiring-title {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: #111827;
+}
+
+.global-expiring-subtitle {
+  font-size: 0.78rem;
+  color: #64748b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.global-expiring-count {
+  min-width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  padding: 0 0.5rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(239, 68, 68, 0.1);
+  color: #b91c1c;
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+.global-expiring-alert.is-urgent .global-expiring-trigger {
+  border-color: rgba(248, 113, 113, 0.3);
+}
+
+.global-expiring-panel {
+  margin-top: 0.7rem;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.65);
+  backdrop-filter: blur(20px);
+  box-shadow: 0 16px 32px rgba(15, 23, 42, 0.14);
+  padding: 0.95rem;
+}
+
+.global-expiring-panel-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.8rem;
+}
+
+.global-expiring-panel-title {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: #111827;
+}
+
+.global-expiring-link {
+  font-size: 0.78rem;
+  text-decoration: none;
+  color: #2563eb;
+  font-weight: 600;
+}
+
+.global-expiring-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.global-expiring-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.75rem 0.8rem;
+  border-radius: 14px;
+  background: rgba(248, 250, 252, 0.95);
+}
+
+.global-expiring-item-name {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #111827;
+}
+
+.global-expiring-item-meta {
+  font-size: 0.76rem;
+  color: #64748b;
+  margin-top: 0.1rem;
+}
+
+.global-expiring-days {
+  flex-shrink: 0;
+  border-radius: 999px;
+  padding: 0.32rem 0.62rem;
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.global-expiring-days.is-danger {
+  background: rgba(239, 68, 68, 0.12);
+  color: #b91c1c;
+}
+
+.global-expiring-days.is-warning {
+  background: rgba(245, 158, 11, 0.14);
+  color: #b45309;
+}
+
+.global-expiring-empty {
+  padding: 0.9rem 0.2rem 0.4rem;
+  font-size: 0.84rem;
+  color: #64748b;
+}
+
+@media (max-width: 767.98px) {
+  .global-expiring-alert {
+    top: 10px;
+    left: 10px;
+    width: calc(100vw - 20px);
+  }
+
+  .global-expiring-trigger {
+    padding: 0.8rem;
+  }
+}

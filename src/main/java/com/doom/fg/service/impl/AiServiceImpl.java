@@ -3,36 +3,47 @@ package com.doom.fg.service.impl;
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONObject;
 import com.doom.fg.context.UserContext;
+import com.doom.fg.dto.AiRecipeResponse;
 import com.doom.fg.entity.AiApiLog;
 import com.doom.fg.entity.FoodItem;
 import com.doom.fg.entity.RecipeRecord;
 import com.doom.fg.entity.User;
+import com.doom.fg.exception.AiException;
 import com.doom.fg.mapper.AiApiLogMapper;
 import com.doom.fg.service.AiService;
 import com.doom.fg.service.FoodItemService;
 import com.doom.fg.service.RecipeRecordService;
 import com.doom.fg.service.UserService;
-import com.doom.fg.util.OpenAiCompatibleEngine;
+import com.doom.fg.util.AiEngine;
+import com.doom.fg.util.AiErrorType;
+import com.doom.fg.util.AiPrompts;
+import com.doom.fg.util.AiResponse;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.util.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
 import java.io.Serializable;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
+
 @Slf4j
 @Service
 public class AiServiceImpl implements AiService {
+    private static final String HISTORY_KEY_PREFIX = "ai:chat:history:";
+    private static final int MAX_HISTORY_SIZE = 10;
+    private static final long HISTORY_EXPIRE_MINUTES = 30;
+    private static final String DEFAULT_RECIPE_TITLE = "AI 生成的家常菜";
 
     @Autowired
     private FoodItemService foodItemService;
@@ -47,7 +58,7 @@ public class AiServiceImpl implements AiService {
     private StringRedisTemplate redisTemplate;
 
     @Autowired
-    private OpenAiCompatibleEngine aiEngine; // 注入通用适配器引擎
+    private AiEngine aiEngine;
 
     @Autowired
     private UserService userService;
@@ -61,165 +72,305 @@ public class AiServiceImpl implements AiService {
     @Value("${ai.model:deepseek-chat}")
     private String defaultModel;
 
-    // Redis Key 前缀
-    private static final String HISTORY_KEY_PREFIX = "ai:chat:history:";
-    // 保留最近 10 条消息 (5轮对话)
-    private static final int MAX_HISTORY_SIZE = 10;
-    // 上下文过期时间
-    private static final long HISTORY_EXPIRE_MINUTES = 30;
-
     @Override
-    public Map<String, String> getAiRecipe(List<Long> foodIds) {
+    public Map<String, Object> getAiRecipe(List<Long> foodIds) {
         List<FoodItem> foodItems = foodItemService.listByIds(foodIds);
         List<String> foodNames = foodItems.stream()
                 .map(FoodItem::getName)
-                .collect(Collectors.toList());
+                .filter(StringUtils::hasText)
+                .toList();
 
-        String foodNamesStr = String.join("、", foodNames);
-        String recipeContent = getRecipe(foodNames);
+        if (foodNames.isEmpty()) {
+            throw new AiException(AiErrorType.AI_BAD_RESPONSE_FORMAT.getCode(), "请先选择至少一种食材");
+        }
 
-        Map<String, String> result = new HashMap<>();
-        result.put("title", "AI 生成的菜谱");
-        result.put("content", recipeContent);
+        AiRecipeResult recipeResult = generateRecipe(foodNames);
+        AiRecipeResponse recipe = recipeResult.getRecipe();
+        String recipeMarkdown = recipe.getMarkdown();
 
-        saveRecipeRecord(foodNamesStr, recipeContent);
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("title", recipe.getTitle());
+        result.put("summary", recipe.getSummary());
+        result.put("content", recipeMarkdown);
+        result.put("markdown", recipeMarkdown);
+        result.put("structured", recipe);
+        result.put("promptVersion", AiPrompts.PROMPT_VERSION);
+        result.put("recipeRecordId", recipeResult.getRecipeRecordId());
         return result;
     }
 
-    private void saveRecipeRecord(String foodNames, String content) {
+    @Override
+    public String chatWithHistory(String userMessage) {
         Long userId = UserContext.getUserId();
-        if (userId == null) return;
+        String redisKey = HISTORY_KEY_PREFIX + userId;
+        AiConfig config = getEffectiveConfig();
+
+        List<AiMessage> history = getHistoryFromRedis(redisKey);
+        if (history.isEmpty()) {
+            throw new AiException(AiErrorType.AI_BAD_RESPONSE_FORMAT.getCode(), "请先选择食材生成菜谱，再继续追问");
+        }
+
+        List<FoodItem> expiringFoods = foodItemService.getExpiringSoon(3);
+        String systemPrompt = AiPrompts.buildChatSystemPrompt(expiringFoods);
+
+        long startTime = System.currentTimeMillis();
+        AiResponse aiResponse = aiEngine.chat(
+                config.getApiKey(),
+                config.getBaseUrl(),
+                config.getModel(),
+                systemPrompt,
+                history,
+                userMessage
+        );
+        long latency = System.currentTimeMillis() - startTime;
+
+        String reply = extractChatReply(aiResponse);
+        saveAiLog(userId, config.getModel(), "CHAT", "RECIPE_CHAT",
+                systemPrompt, userMessage, reply, aiResponse, latency, 0, null);
+
+        saveToRedis(redisKey, new AiMessage("user", userMessage));
+        saveToRedis(redisKey, new AiMessage("assistant", reply));
+        return reply;
+    }
+
+    @Override
+    public void submitRecipeFeedback(Long recipeRecordId, String feedbackStatus, String feedbackReason) {
+        if (recipeRecordId == null) {
+            throw new AiException(AiErrorType.AI_BAD_RESPONSE_FORMAT.getCode(), "缺少菜谱记录 ID");
+        }
+        if (!StringUtils.hasText(feedbackStatus)) {
+            throw new AiException(AiErrorType.AI_BAD_RESPONSE_FORMAT.getCode(), "请选择反馈结果");
+        }
+
+        Long userId = UserContext.getUserId();
+        RecipeRecord record = recipeRecordService.getById(recipeRecordId);
+        if (record == null || !userId.equals(record.getUserId())) {
+            throw new AiException(AiErrorType.AI_BAD_RESPONSE_FORMAT.getCode(), "未找到对应的菜谱记录");
+        }
+
+        record.setFeedbackStatus(feedbackStatus);
+        record.setFeedbackReason(StringUtils.hasText(feedbackReason) ? feedbackReason.trim() : null);
+        record.setFeedbackTime(LocalDateTime.now());
+        recipeRecordService.updateById(record);
+    }
+
+    @Override
+    public void clearHistory() {
+        Long userId = UserContext.getUserId();
+        if (userId == null) {
+            throw new RuntimeException("用户未登录");
+        }
+        redisTemplate.delete(HISTORY_KEY_PREFIX + userId);
+    }
+
+    private AiRecipeResult generateRecipe(List<String> foods) {
+        Long userId = UserContext.getUserId();
+        String redisKey = HISTORY_KEY_PREFIX + userId;
+        AiConfig config = getEffectiveConfig();
+
+        redisTemplate.delete(redisKey);
+
+        String systemPrompt = AiPrompts.buildRecipeSystemPrompt(buildPreferencesPrompt(config));
+        String userPrompt = AiPrompts.buildRecipeUserPrompt(foods);
+
+        long startTime = System.currentTimeMillis();
+        AiResponse aiResponse = aiEngine.chat(
+                config.getApiKey(),
+                config.getBaseUrl(),
+                config.getModel(),
+                systemPrompt,
+                null,
+                userPrompt
+        );
+        long latency = System.currentTimeMillis() - startTime;
+
+        try {
+            AiRecipeResponse recipe = extractRecipe(aiResponse);
+            Long recipeRecordId = saveRecipeRecord(String.join("、", foods), recipe.getTitle(), recipe.getMarkdown());
+            saveAiLog(userId, config.getModel(), "RECIPE", "RECIPE_GENERATE",
+                    systemPrompt, userPrompt, recipe.getMarkdown(), aiResponse, latency, foods.size(), null);
+            saveToRedis(redisKey, new AiMessage("user", userPrompt));
+            saveToRedis(redisKey, new AiMessage("assistant", recipe.getMarkdown()));
+            return new AiRecipeResult(recipe, recipeRecordId);
+        } catch (AiException e) {
+            saveAiLog(userId, config.getModel(), "RECIPE", "RECIPE_GENERATE",
+                    systemPrompt, userPrompt, null, aiResponse, latency, foods.size(), e.getErrorCode());
+            throw e;
+        }
+    }
+
+    private String buildPreferencesPrompt(AiConfig config) {
+        List<String> parts = new ArrayList<>();
+        if (StringUtils.hasText(config.getTastePreference())) {
+            parts.add("口味偏好：" + config.getTastePreference());
+        }
+        if (StringUtils.hasText(config.getDietGoal())) {
+            parts.add("饮食目标：" + config.getDietGoal());
+        }
+        if (StringUtils.hasText(config.getTaboos())) {
+            parts.add("忌口说明：" + config.getTaboos());
+        }
+        if (StringUtils.hasText(config.getCookingTimePreference())) {
+            parts.add("烹饪时长偏好：" + config.getCookingTimePreference());
+        }
+        return parts.isEmpty()
+                ? "未提供额外偏好，请按通用家常菜思路生成。"
+                : String.join("；", parts) + "。";
+    }
+
+    private AiRecipeResponse extractRecipe(AiResponse aiResponse) {
+        if (!aiResponse.isSuccess()) {
+            AiErrorType errorType = aiResponse.getErrorType() == null ? AiErrorType.AI_UNKNOWN_ERROR : aiResponse.getErrorType();
+            throw new AiException(errorType.getCode(), errorType.getUserMessage());
+        }
+
+        try {
+            String rawContent = sanitizeJson(aiResponse.getContent());
+            AiRecipeResponse recipe = JSON.parseObject(rawContent, AiRecipeResponse.class);
+            normalizeRecipe(recipe);
+            return recipe;
+        } catch (Exception e) {
+            log.warn("Failed to parse recipe response: {}", aiResponse.getContent(), e);
+            throw new AiException(AiErrorType.AI_BAD_RESPONSE_FORMAT.getCode(), AiErrorType.AI_BAD_RESPONSE_FORMAT.getUserMessage());
+        }
+    }
+
+    private String extractChatReply(AiResponse aiResponse) {
+        if (!aiResponse.isSuccess()) {
+            AiErrorType errorType = aiResponse.getErrorType() == null ? AiErrorType.AI_UNKNOWN_ERROR : aiResponse.getErrorType();
+            throw new AiException(errorType.getCode(), errorType.getUserMessage());
+        }
+        return aiResponse.getContent();
+    }
+
+    private void normalizeRecipe(AiRecipeResponse recipe) {
+        if (!StringUtils.hasText(recipe.getTitle())) {
+            recipe.setTitle(DEFAULT_RECIPE_TITLE);
+        }
+        if (recipe.getIngredients() == null) {
+            recipe.setIngredients(new ArrayList<>());
+        }
+        if (recipe.getSteps() == null) {
+            recipe.setSteps(new ArrayList<>());
+        }
+        if (recipe.getTips() == null) {
+            recipe.setTips(new ArrayList<>());
+        }
+        if (!StringUtils.hasText(recipe.getDifficulty())) {
+            recipe.setDifficulty("easy");
+        }
+        if (recipe.getEstimatedTimeMinutes() == null || recipe.getEstimatedTimeMinutes() < 0) {
+            recipe.setEstimatedTimeMinutes(20);
+        }
+        if (!StringUtils.hasText(recipe.getSummary())) {
+            recipe.setSummary("优先利用现有食材完成的一道家常菜。");
+        }
+        if (!StringUtils.hasText(recipe.getNutrition())) {
+            recipe.setNutrition("营养信息根据当前食材组合做了简要估算。");
+        }
+        if (!StringUtils.hasText(recipe.getMarkdown())) {
+            recipe.setMarkdown(buildMarkdown(recipe));
+        }
+        if (recipe.getUseExpiringFoodFirst() == null) {
+            recipe.setUseExpiringFoodFirst(Boolean.FALSE);
+        }
+    }
+
+    private String buildMarkdown(AiRecipeResponse recipe) {
+        StringBuilder builder = new StringBuilder();
+        builder.append("# ").append(recipe.getTitle()).append("\n\n");
+        builder.append("**简介：** ").append(recipe.getSummary()).append("\n\n");
+        builder.append("## 食材\n");
+        for (AiRecipeResponse.IngredientItem ingredient : recipe.getIngredients()) {
+            String amount = StringUtils.hasText(ingredient.getAmount()) ? " - " + ingredient.getAmount() : "";
+            builder.append("- ").append(ingredient.getName()).append(amount).append("\n");
+        }
+        builder.append("\n## 步骤\n");
+        for (int i = 0; i < recipe.getSteps().size(); i++) {
+            builder.append(i + 1).append(". ").append(recipe.getSteps().get(i)).append("\n");
+        }
+        if (!recipe.getTips().isEmpty()) {
+            builder.append("\n## 小贴士\n");
+            for (String tip : recipe.getTips()) {
+                builder.append("- ").append(tip).append("\n");
+            }
+        }
+        builder.append("\n## 营养说明\n").append(recipe.getNutrition()).append("\n");
+        return builder.toString();
+    }
+
+    private Long saveRecipeRecord(String foodNames, String title, String content) {
+        Long userId = UserContext.getUserId();
+        if (userId == null) {
+            return null;
+        }
 
         RecipeRecord record = new RecipeRecord();
         record.setUserId(userId);
         record.setFoodNames(foodNames);
-        record.setTitle("AI 生成的菜谱");
+        record.setTitle(StringUtils.hasText(title) ? title : DEFAULT_RECIPE_TITLE);
         record.setContent(content);
         recipeRecordService.save(record);
+        return record.getId();
     }
 
-    /**
-     * 初始菜谱生成：解决错误1
-     */
-    public String getRecipe(List<String> foods) {
-        Long userId = UserContext.getUserId();
-        User user = userService.getById(userId);
+    private void saveAiLog(Long userId, String model, String requestType, String scenarioType,
+                           String systemPrompt, String userMessage, String reply,
+                           AiResponse aiResponse, long latency, int foodCount, String overrideErrorType) {
+        AiApiLog logEntity = new AiApiLog();
+        logEntity.setUserId(userId);
+        logEntity.setModel(model);
+        logEntity.setRequestType(requestType);
+        logEntity.setPromptVersion(AiPrompts.PROMPT_VERSION);
+        logEntity.setScenarioType(scenarioType);
+        logEntity.setFoodCount(foodCount);
+        logEntity.setLatencyMs(latency);
+        logEntity.setIsSuccess(aiResponse.isSuccess() ? 1 : 0);
 
-        String redisKey = HISTORY_KEY_PREFIX + userId;
-        // 1. 获取配置路由 (解决变量缺失问题)
-        AiConfig config = getEffectiveConfig();
-
-        // 2. 清理旧对话，构建新提示词
-        redisTemplate.delete(redisKey);
-        String foodList = String.join("、", foods);
-
-        String systemPrompt = "你是一个专业的'冰箱守卫者'主厨。你的任务是基于用户提供的食材清单设计菜谱。\n" +
-                "【核心规则】\n" +
-                "1. 严禁引入清单中不存在的主食材（肉类、蔬菜、蛋奶等）。你可以假设用户拥有基础调料（油盐酱醋糖、葱姜蒜、辣椒等）。\n" +
-                "2. 如果用户提供的食材无法组合成常规菜肴，请发挥创意进行混搭，或者礼貌告知无法生成。\n" +
-                "3. 输出格式要求：Markdown格式，包含菜名、食材表、详细步骤、营养贴士。\n" +
-                "4. 这一步是确立“食材范围”的关键，后续对话将严格限制在这个范围内。";
-
-        String userPrompt = "我冰箱里有这些食材：" + foodList + "。请帮我设计一道美味的家常菜。";
-
-        // 3. 调用适配器引擎 (解决参数不匹配问题，传入6个参数)
-        String aiReply = aiEngine.chat(config.getApiKey(), config.getBaseUrl(), config.getModel(), systemPrompt, null, userPrompt);
-
-        // 4. 构建初始记忆
-        if (aiReply != null && !aiReply.startsWith("Error")) {
-            saveToRedis(redisKey, new AiMessage("user", userPrompt));
-            saveToRedis(redisKey, new AiMessage("assistant", aiReply));
+        String resolvedErrorType = overrideErrorType;
+        if (!StringUtils.hasText(resolvedErrorType) && aiResponse.getErrorType() != null) {
+            resolvedErrorType = aiResponse.getErrorType().getCode();
         }
-        return aiReply;
+        logEntity.setErrorType(resolvedErrorType);
+
+        if (!aiResponse.isSuccess() || StringUtils.hasText(resolvedErrorType)) {
+            String rawError = aiResponse.getRawError();
+            if (!StringUtils.hasText(rawError) && StringUtils.hasText(resolvedErrorType)) {
+                rawError = resolvedErrorType;
+            }
+            logEntity.setErrorMsg(rawError);
+        }
+
+        int estimatedPromptTokens = safeLength(systemPrompt) + safeLength(userMessage);
+        int estimatedCompletionTokens = safeLength(reply);
+
+        int promptTokens = aiResponse.getPromptTokens() != null ? aiResponse.getPromptTokens() : estimatedPromptTokens;
+        int completionTokens = aiResponse.getCompletionTokens() != null ? aiResponse.getCompletionTokens() : estimatedCompletionTokens;
+        int totalTokens = aiResponse.getTotalTokens() != null ? aiResponse.getTotalTokens() : promptTokens + completionTokens;
+
+        logEntity.setPromptTokens(promptTokens);
+        logEntity.setCompletionTokens(completionTokens);
+        logEntity.setTotalTokens(totalTokens);
+        aiApiLogMapper.insert(logEntity);
     }
 
-    /**
-     * 支持上下文的对话：维持对话锁定逻辑
-     */
-    @Override
-    public String chatWithHistory(String userMessage) {
-        Long userId = UserContext.getUserId();
-        User user = userService.getById(userId);
-        String redisKey = HISTORY_KEY_PREFIX + userId;
-
-        // 1. 动态获取配置
-        AiConfig config = getEffectiveConfig();
-
-        // 2. 获取历史记录
-        List<AiMessage> history = getHistoryFromRedis(redisKey);
-        if (history == null || history.isEmpty()) {
-            return "抱歉，我的记忆断片了。请先选择食材生成菜谱。";
-        }
-
-        // 3. MCP逻辑：注入实时临期上下文
-        List<FoodItem> expiringFoods = foodItemService.getExpiringSoon(3);
-        String fridgeContext = expiringFoods.stream()
-                .map(f -> f.getName() + "(余" + f.getDaysLeft() + "天)")
-                .collect(Collectors.joining("、"));
-
-        // 4. 构建严格的对话主题锁定提示词
-        String systemPrompt = "你是一个贴心的厨师助手。用户正在根据之前生成的菜谱提出调整需求。\n" +
-                "【当前冰箱实时库存】： " + (fridgeContext.isEmpty() ? "无临期食材" : fridgeContext) + "\n" +
-                "【严格指令】\n" +
-                "1. 你的回答必须完全基于上下文中的食材清单。严禁引入新的主食材。\n" +
-                "2. 优先建议用户使用上述【临期清单】中的食材。\n" +
-                "3. 用户的调整只能通过调整调料、烹饪方式实现。\n" +
-                "4. 如果要求无法实现（如只有鸡蛋要求做肉），请礼貌拒绝并解释。";
-
-        // 1. 记录开始时间
-        long startTime = System.currentTimeMillis();
-        // 5. 调用适配器 (解决参数不匹配问题，传入6个参数)
-        String aiReply = aiEngine.chat(config.getApiKey(), config.getBaseUrl(), config.getModel(), systemPrompt, history, userMessage);
-        // 3. 记录结束时间并计算耗时
-        long endTime = System.currentTimeMillis();
-        long latency = endTime - startTime;
-        // 4. 【新增】构建日志实体并保存到数据库
-        AiApiLog log = new AiApiLog();
-        log.setUserId(userId);
-        log.setModel(config.getModel());
-        log.setRequestType("CHAT");
-        log.setLatencyMs(latency);
-// 判断是否成功 (根据你的 OpenAiCompatibleEngine，失败会返回 "Error:")
-        boolean isSuccess = aiReply != null && !aiReply.startsWith("Error");
-        log.setIsSuccess(isSuccess ? 1 : 0);
-
-        if (!isSuccess) {
-            log.setErrorMsg(aiReply); // 记录错误信息
-        }
-
-        // 简易估算 Token (为了让图表有数据)
-        // 真实项目中应该解析 API 返回的 usage 字段，但目前接口不支持，先估算
-        int promptLen = userMessage.length() + systemPrompt.length();
-        int replyLen = aiReply != null ? aiReply.length() : 0;
-        log.setPromptTokens(promptLen);
-        log.setCompletionTokens(replyLen);
-        log.setTotalTokens(promptLen + replyLen);
-
-        // 插入数据库！
-        aiApiLogMapper.insert(log);
-
-        // 5. 维护对话滑动窗口 (原有代码)
-        if (isSuccess) {
-            saveToRedis(redisKey, new AiMessage("user", userMessage));
-            saveToRedis(redisKey, new AiMessage("assistant", aiReply));
-        }
-        return aiReply;
+    private int safeLength(String value) {
+        return value == null ? 0 : value.length();
     }
 
-    /**
-     * 获取有效的 AI 配置 (用户配置优先 -> 系统配置兜底)
-     */
     private AiConfig getEffectiveConfig() {
         Long userId = UserContext.getUserId();
         User user = userService.getById(userId);
 
-        // 默认值
         String apiKey = defaultApiKey;
         String baseUrl = defaultApiUrl;
         String model = defaultModel;
-        boolean isCustom = false; // 标记是否使用了自定义配置
+        String tastePreference = "";
+        String dietGoal = "";
+        String taboos = "";
+        String cookingTimePreference = "";
+        boolean isCustom = false;
 
-        // 1. 尝试从用户个性化配置中覆盖
         if (user != null && StringUtils.hasText(user.getAiConfig())) {
             try {
                 JSONObject userConfig = JSON.parseObject(user.getAiConfig());
@@ -236,31 +387,33 @@ public class AiServiceImpl implements AiService {
                         model = userConfig.getString("model");
                         isCustom = true;
                     }
+                    tastePreference = userConfig.getString("tastePreference");
+                    dietGoal = userConfig.getString("dietGoal");
+                    taboos = userConfig.getString("taboos");
+                    cookingTimePreference = userConfig.getString("cookingTimePreference");
                 }
             } catch (Exception e) {
-                log.error("用户 {} AI配置解析失败，降级使用默认配置", userId, e);
+                log.error("User {} AI config parse failed, fallback to default", userId, e);
             }
         }
 
-        // 【日志核心点】打印当前使用的配置来源
         if (isCustom) {
-            log.info(">>> 使用用户 [自定义] AI配置 | Model: {} | URL: {}", model, baseUrl);
+            log.info("Using custom AI config. model={}, baseUrl={}", model, baseUrl);
         } else {
-            log.info(">>> 使用系统 [默认] AI配置 | Model: {} | URL: {}", model, baseUrl);
+            log.info("Using default AI config. model={}, baseUrl={}", model, baseUrl);
         }
 
-        // 2. 最终检查
         if (!StringUtils.hasText(apiKey)) {
-            log.error("用户 {} 未配置AI，且系统无默认配置", userId);
-            throw new RuntimeException("AI_CONFIG_MISSING");
+            throw new AiException(AiErrorType.AI_CONFIG_MISSING.getCode(), AiErrorType.AI_CONFIG_MISSING.getUserMessage());
         }
-
-        return new AiConfig(apiKey, baseUrl, model);
+        return new AiConfig(apiKey, baseUrl, model, tastePreference, dietGoal, taboos, cookingTimePreference);
     }
-    // --- 内部私有方法 (Redis维护) ---
+
     private List<AiMessage> getHistoryFromRedis(String key) {
         List<String> jsonList = redisTemplate.opsForList().range(key, 0, -1);
-        if (jsonList == null || jsonList.isEmpty()) return new ArrayList<>();
+        if (jsonList == null || jsonList.isEmpty()) {
+            return new ArrayList<>();
+        }
         return jsonList.stream()
                 .map(json -> JSON.parseObject(json, AiMessage.class))
                 .collect(Collectors.toList());
@@ -275,11 +428,17 @@ public class AiServiceImpl implements AiService {
         redisTemplate.expire(key, HISTORY_EXPIRE_MINUTES, TimeUnit.MINUTES);
     }
 
-    @Override
-    public void clearHistory() {
-        Long userId = UserContext.getUserId();
-        if (userId == null) throw new RuntimeException("用户未登录");
-        redisTemplate.delete(HISTORY_KEY_PREFIX + userId);
+    private String sanitizeJson(String content) {
+        String trimmed = content == null ? "" : content.trim();
+        if (trimmed.startsWith("```json")) {
+            trimmed = trimmed.substring(7).trim();
+        } else if (trimmed.startsWith("```")) {
+            trimmed = trimmed.substring(3).trim();
+        }
+        if (trimmed.endsWith("```")) {
+            trimmed = trimmed.substring(0, trimmed.length() - 3).trim();
+        }
+        return trimmed;
     }
 
     @Data
@@ -289,6 +448,7 @@ public class AiServiceImpl implements AiService {
         private String role;
         private String content;
     }
+
     @Data
     @AllArgsConstructor
     @NoArgsConstructor
@@ -296,5 +456,16 @@ public class AiServiceImpl implements AiService {
         private String apiKey;
         private String baseUrl;
         private String model;
+        private String tastePreference;
+        private String dietGoal;
+        private String taboos;
+        private String cookingTimePreference;
+    }
+
+    @Data
+    @AllArgsConstructor
+    private static class AiRecipeResult {
+        private AiRecipeResponse recipe;
+        private Long recipeRecordId;
     }
 }

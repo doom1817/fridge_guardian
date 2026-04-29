@@ -8,24 +8,23 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
   <link href="/css/index.css" rel="stylesheet">
-  <link th:href="@{/css/ai_recipe.css}" rel="stylesheet">
-
+  <link href="/css/ai_recipe.css" rel="stylesheet">
   <style>
-    /* 针对 AI 页面的微调 */
     .glass-card {
       display: flex;
       flex-direction: column;
-      overflow: hidden; /* 防止圆角溢出 */
+      overflow: hidden;
     }
-    /* 自定义滚动条适配毛玻璃 */
+
     .overflow-auto::-webkit-scrollbar {
       width: 6px;
     }
+
     .overflow-auto::-webkit-scrollbar-thumb {
-      background-color: rgba(0,0,0,0.1);
+      background-color: rgba(0, 0, 0, 0.1);
       border-radius: 3px;
     }
-    /* 导航栏适配 */
+
     .glass-nav {
       background: rgba(255, 255, 255, 0.4);
       backdrop-filter: blur(10px);
@@ -34,7 +33,6 @@
   </style>
 </head>
 <body>
-
 <div class="background-blobs">
   <div class="blob blob-1"></div>
   <div class="blob blob-2"></div>
@@ -57,9 +55,8 @@
   </div>
 </nav>
 
-<div class="container" style="margin-top: 80px; height: calc(100vh - 100px);">
+<div class="container recipe-page-shell">
   <div class="row g-4 h-100 pb-4">
-
     <div class="col-md-4 h-100">
       <div class="glass-card p-0 h-100 animate-enter delay-1">
         <div class="p-3 border-bottom border-light bg-white bg-opacity-25">
@@ -83,9 +80,14 @@
         </div>
 
         <div class="p-3 border-top border-light bg-white bg-opacity-25">
-          <button onclick="generateRecipe()" class="btn btn-primary btn-glow w-100 bg-gradient-teal border-0 shadow-sm py-2">
-            <i class="bi bi-stars me-1"></i> 生成 AI 食谱
-          </button>
+          <div class="d-grid gap-2">
+            <button onclick="generateRecipe()" class="btn btn-primary btn-glow w-100 bg-gradient-teal border-0 shadow-sm py-2">
+              <i class="bi bi-stars me-1"></i> 生成 AI 食谱
+            </button>
+            <button id="regenerateButton" onclick="regenerateRecipe()" class="btn btn-light border-0 shadow-sm py-2 text-primary fw-bold" style="display: none;">
+              <i class="bi bi-arrow-repeat me-1"></i> 同样食材再来一道
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -93,29 +95,55 @@
     <div class="col-md-8 h-100">
       <div class="glass-card p-0 h-100 animate-enter delay-2">
         <div class="p-3 border-bottom border-light bg-white bg-opacity-25 d-flex justify-content-between align-items-center">
-          <h5 class="mb-0 fw-bold text-dark">
-            <i class="bi bi-chat-dots-fill me-2 text-success"></i>AI 厨师助手
-          </h5>
+          <div>
+            <h5 class="mb-0 fw-bold text-dark">
+              <i class="bi bi-chat-dots-fill me-2 text-success"></i>AI 厨师助手
+            </h5>
+            <small class="text-muted">先选食材，再让 AI 给你一份更贴合库存的做法</small>
+          </div>
           <button onclick="clearHistory()" class="btn btn-sm btn-outline-danger rounded-pill border-0" title="清空对话">
             <i class="bi bi-trash3"></i>
           </button>
         </div>
 
-        <div id="chatHistory" class="p-4 overflow-auto flex-grow-1" style="background: rgba(255,255,255,0.3);">
+        <div id="chatHistory" class="p-4 overflow-auto flex-grow-1">
           <div class="text-center text-muted mt-5 opacity-75">
             <i class="bi bi-robot fs-1 d-block mb-3"></i>
-            <p>👈 请在左侧勾选食材，点击“生成食谱”</p>
+            <p>请在左侧勾选食材，点击“生成食谱”</p>
             <small>支持 DeepSeek / Qwen / OpenAI 等模型</small>
           </div>
         </div>
 
-        <div class="p-3 border-top border-light bg-white bg-opacity-50" id="inputArea" style="display: none;">
-          <div class="input-group shadow-sm rounded-pill overflow-hidden bg-white">
-            <input type="text" id="userMessage" class="form-control border-0 px-4 py-2"
+        <div class="px-3 pt-3 bg-white bg-opacity-50 border-top border-light" id="quickActions" style="display: none;">
+          <div class="d-flex flex-wrap gap-2">
+            <button type="button" class="btn btn-sm quick-action-btn" onclick="sendQuickPrompt('换一个更快的做法')">更快做法</button>
+            <button type="button" class="btn btn-sm quick-action-btn" onclick="sendQuickPrompt('更适合减脂')">减脂友好</button>
+            <button type="button" class="btn btn-sm quick-action-btn" onclick="sendQuickPrompt('更清淡一点')">更清淡些</button>
+            <button type="button" class="btn btn-sm quick-action-btn" onclick="sendQuickPrompt('优先消耗临期食材')">优先临期</button>
+            <button type="button" class="btn btn-sm quick-action-btn" onclick="sendQuickPrompt('把步骤再简化一点')">步骤更简</button>
+          </div>
+
+          <div id="feedbackPanel" class="feedback-panel mt-3" style="display: none;">
+            <div class="feedback-label">这次推荐怎么样？</div>
+            <div class="d-flex flex-wrap gap-2">
+              <button type="button" class="btn btn-sm feedback-btn feedback-good" onclick="submitRecipeFeedback('HELPFUL')">
+                <i class="bi bi-hand-thumbs-up me-1"></i> 有帮助
+              </button>
+              <button type="button" class="btn btn-sm feedback-btn feedback-bad" onclick="openFeedbackModal()">
+                <i class="bi bi-hand-thumbs-down me-1"></i> 不太合适
+              </button>
+            </div>
+            <div id="feedbackHint" class="feedback-hint mt-2"></div>
+          </div>
+        </div>
+
+        <div class="p-3 border-top-0 bg-white bg-opacity-50" id="inputArea" style="display: none;">
+          <div class="chat-compose-shell">
+            <input type="text" id="userMessage" class="chat-compose-input"
                    placeholder="觉得太淡了？或者想换种做法？直接告诉我..."
-                   onkeypress="if(event.keyCode==13) sendMessage()">
-            <button class="btn btn-primary px-4 border-0 bg-gradient-blue" onclick="sendMessage()">
-              <i class="bi bi-send-fill"></i>
+                   onkeypress="if(event.keyCode===13) sendMessage()">
+            <button class="chat-send-btn" onclick="sendMessage()" aria-label="发送消息" title="发送消息">
+              <i class="bi bi-arrow-up"></i>
             </button>
           </div>
         </div>
@@ -145,6 +173,7 @@
           <div class="mb-3">
             <label class="small text-muted fw-bold mb-1">API Key</label>
             <input type="password" id="config-key" class="form-control rounded-3" placeholder="sk-..." required>
+            <small class="text-muted d-block mt-1">已保存的 Key 会以脱敏形式展示；不修改可直接保留。</small>
           </div>
           <div class="mb-3">
             <label class="small text-muted fw-bold mb-1">Base URL</label>
@@ -154,6 +183,41 @@
             <label class="small text-muted fw-bold mb-1">Model Name</label>
             <input type="text" id="config-model" class="form-control rounded-3" required>
           </div>
+
+          <hr class="my-4">
+
+          <div class="mb-3">
+            <label class="small text-muted fw-bold mb-1">口味偏好</label>
+            <select class="form-select rounded-3" id="config-taste">
+              <option value="">默认即可</option>
+              <option value="清淡">清淡</option>
+              <option value="家常">家常</option>
+              <option value="香辣">香辣</option>
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="small text-muted fw-bold mb-1">饮食目标</label>
+            <select class="form-select rounded-3" id="config-goal">
+              <option value="">默认即可</option>
+              <option value="普通">普通</option>
+              <option value="减脂">减脂</option>
+              <option value="增肌">增肌</option>
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="small text-muted fw-bold mb-1">忌口说明</label>
+            <input type="text" id="config-taboos" class="form-control rounded-3" placeholder="例如：不吃辣、海鲜过敏">
+          </div>
+          <div class="mb-3">
+            <label class="small text-muted fw-bold mb-1">烹饪时长偏好</label>
+            <select class="form-select rounded-3" id="config-time">
+              <option value="">默认即可</option>
+              <option value="10分钟内">10分钟内</option>
+              <option value="20分钟左右">20分钟左右</option>
+              <option value="40分钟内">40分钟内</option>
+            </select>
+          </div>
+
           <button type="button" class="btn btn-primary btn-glow w-100 bg-gradient-blue border-0 mt-2" onclick="saveAiConfig()">
             保存配置
           </button>
@@ -163,8 +227,36 @@
   </div>
 </div>
 
+<div class="modal fade" id="feedbackReasonModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content feedback-modal">
+      <div class="modal-header border-0 pb-2">
+        <div>
+          <h5 class="modal-title fw-bold mb-1">哪里不太合适？</h5>
+          <small class="text-muted">选一个最接近的原因，也可以补一句说明。</small>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body pt-2">
+        <div class="feedback-reason-grid">
+          <button type="button" class="feedback-reason-pill" data-reason="太复杂">太复杂</button>
+          <button type="button" class="feedback-reason-pill" data-reason="食材不贴合">食材不贴合</button>
+          <button type="button" class="feedback-reason-pill" data-reason="口味不合适">口味不合适</button>
+          <button type="button" class="feedback-reason-pill" data-reason="不够实用">不够实用</button>
+        </div>
+        <textarea id="feedbackReasonInput" class="form-control feedback-textarea mt-3" rows="4" placeholder="补充一点你的感觉，比如“想更简单一点”"></textarea>
+      </div>
+      <div class="modal-footer border-0 pt-0">
+        <button type="button" class="btn btn-light rounded-pill px-3" data-bs-dismiss="modal">取消</button>
+        <button type="button" class="btn btn-danger rounded-pill px-4" onclick="submitNegativeFeedback()">提交反馈</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-<script th:src="@{/js/ai_recipe.js}"></script>
+<script src="/js/expiring_alert.js"></script>
+<script src="/js/ai_recipe.js"></script>
 </body>
 </html>

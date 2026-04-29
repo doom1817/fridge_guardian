@@ -86,12 +86,12 @@ CREATE TABLE `ai_api_log` (
 
 
 -- ==================================================
--- 数据初始化 (基准日期: 2026-02-16)
+-- 数据初始化 (基准日期: 2026-4-29)
 -- ==================================================
 
 -- 1. 插入测试用户 (密码: 123456) BCryptPasswordEncoder
 INSERT INTO `user` (username, password, email, ai_config) VALUES
-    ('admin', '$2a$10$yoXh/gIVkY7tHbnfGJXLAuY8HHCGc1X1JdA.JMzrhMcJeryELNCiq', 'admin@example.com', '{"engineType":"DIFY","apiKey":"sk-1f7adfd6ef99498599bf9edd01d0118c","baseUrl":"http://192.168.6.132:8100/v1"}');
+    ('admin', '$2a$10$yoXh/gIVkY7tHbnfGJXLAuY8HHCGc1X1JdA.JMzrhMcJeryELNCiq', 'admin@example.com', '{"engineType":"DIFY","apiKey":"sk-1f7adfd6ef99498599bf9edd01d0118c","baseUrl":"http://localhost:8100/v1"}');
 
 -- 2. 插入食材分类
 INSERT INTO `category` (name, default_expiry_days, icon) VALUES
@@ -102,21 +102,21 @@ INSERT INTO `category` (name, default_expiry_days, icon) VALUES
                                                              ('乳品烘焙', 10, 'cheese'),
                                                              ('零食干货', 60, 'cookie');
 
--- 3. 插入食材库存 (模拟 2026-02-16 的真实分布)
+-- 3. 插入食材库存 (模拟 2026-04-29 的真实分布)
 INSERT INTO `food_item` (user_id, category_id, name, quantity, unit, purchase_date, expiry_date, storage_location, status) VALUES
 
--- [场景A：非常紧急] 今天(2.16)就过期 -> 列表应显示为极致高亮
-(1, 5, '鲜牛奶', 1, '盒', '2026-02-10', '2026-02-16', 'FRIDGE', 0),
+-- [场景A：非常紧急] 今天(04-29)就过期 -> 列表应显示为极致高亮
+(1, 5, '鲜牛奶', 1, '盒', '2026-02-10', '2026-04-29', 'FRIDGE', 0),
 
--- [场景B：临期预警] 明天(2.17)过期 (剩余1天)
-(1, 1, '生菜', 2, '把', '2026-02-14', '2026-02-17', 'FRIDGE', 0),
+-- [场景B：临期预警] 明天(04-30)过期 (剩余1天)
+(1, 1, '生菜', 2, '把', '2026-02-14', '2026-04-30', 'FRIDGE', 0),
 
--- [场景C：临期预警] 后天(2.18)过期 (剩余2天)
-(1, 3, '鲜活鲈鱼', 1, '条', '2026-02-15', '2026-02-18', 'FRIDGE', 0),
+-- [场景C：临期预警] 后天(04-29)过期 (剩余2天)
+(1, 3, '鲜活鲈鱼', 1, '条', '2026-02-15', '2026-05-01', 'FRIDGE', 0),
 
 -- [场景D：状态良好] 还有很久过期
-(1, 2, '黑猪里脊', 500, '克', '2026-02-15', '2026-02-25', 'FREEZER', 0),
-(1, 4, '砂糖橘', 1, '斤', '2026-02-15', '2026-03-05', 'FRIDGE', 0),
+(1, 2, '黑猪里脊', 500, '克', '2026-02-15', '2026-05-5', 'FREEZER', 0),
+(1, 4, '砂糖橘', 1, '斤', '2026-02-15', '2026-06-05', 'FRIDGE', 0),
 (1, 6, '混合坚果', 1, '罐', '2026-01-20', '2026-07-20', 'PANTRY', 0),
 
 -- [场景E：已吃完数据] (用于饼图：健康食用)
@@ -125,3 +125,45 @@ INSERT INTO `food_item` (user_id, category_id, name, quantity, unit, purchase_da
 
 -- [场景F：已浪费数据] (用于饼图：遗憾浪费)
 (1, 5, '吐司面包', 1, '袋', '2026-02-01', '2026-02-06', 'PANTRY', 2);
+-- ==================================================
+-- 增量更新草案：AI 日志增强字段
+-- 说明：
+-- 1. 下面语句用于“已有数据库”的手动升级
+-- 2. 请检查后按需执行，不要与上面的 DROP/CREATE 全量初始化混用
+# ==================================================
+ALTER TABLE `ai_api_log`
+  ADD COLUMN `prompt_version` VARCHAR(20) DEFAULT 'v1' COMMENT 'Prompt版本' AFTER `request_type`,
+  ADD COLUMN `scenario_type` VARCHAR(50) DEFAULT 'RECIPE_GENERATE' COMMENT '场景类型' AFTER `prompt_version`,
+  ADD COLUMN `food_count` INT DEFAULT 0 COMMENT '本次使用食材数量' AFTER `total_tokens`,
+  ADD COLUMN `error_type` VARCHAR(50) NULL COMMENT '错误类型' AFTER `is_success`;
+-- --------------------------------------------------
+-- AI 日志测试示例（仅作参考，执行前请先确认字段已更新）
+-- 不修改现有测试用户数据
+-- --------------------------------------------------
+INSERT INTO `ai_api_log`
+(`user_id`, `model`, `request_type`, `prompt_version`, `scenario_type`,
+ `prompt_tokens`, `completion_tokens`, `total_tokens`, `food_count`,
+ `latency_ms`, `status_code`, `is_success`, `error_type`, `error_msg`)
+VALUES
+(1, 'deepseek-chat', 'RECIPE', 'v1', 'RECIPE_GENERATE', 860, 1240, 2100, 3, 1880, 200, 1, NULL, NULL),
+(1, 'deepseek-chat', 'CHAT', 'v1', 'RECIPE_CHAT', 420, 260, 680, 0, 920, 200, 1, NULL, NULL),
+(1, 'deepseek-chat', 'RECIPE', 'v1', 'RECIPE_GENERATE', 520, 0, 520, 2, 3100, 401, 0, 'AI_API_UNAUTHORIZED', 'HTTP_401');
+-- ==================================================
+-- 增量更新草案：菜谱反馈字段
+-- 说明：
+-- 1. 下面语句用于“已有数据库”的手动升级
+-- 2. 请检查后按需执行
+-- ==================================================
+ALTER TABLE `recipe_record`
+  ADD COLUMN `feedback_status` VARCHAR(30) NULL COMMENT '反馈结果' AFTER `content`,
+  ADD COLUMN `feedback_reason` VARCHAR(255) NULL COMMENT '反馈原因' AFTER `feedback_status`,
+  ADD COLUMN `feedback_time` DATETIME NULL COMMENT '反馈时间' AFTER `feedback_reason`;
+
+-- --------------------------------------------------
+-- 菜谱反馈测试示例（仅作参考，执行前请先确认字段已更新）
+-- --------------------------------------------------
+UPDATE `recipe_record`
+SET `feedback_status` = 'HELPFUL',
+    `feedback_reason` = '步骤清晰，适合当前库存',
+    `feedback_time` = NOW()
+WHERE `id` = 1;

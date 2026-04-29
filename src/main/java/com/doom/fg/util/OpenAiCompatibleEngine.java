@@ -4,67 +4,100 @@ import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONArray;
 import com.alibaba.fastjson2.JSONObject;
 import com.doom.fg.service.impl.AiServiceImpl;
-import okhttp3.*;
+import okhttp3.MediaType;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.RequestBody;
+import okhttp3.Response;
 import org.springframework.stereotype.Component;
 
+import java.net.SocketTimeoutException;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
-/**
- * Created with IntelliJ IDEA.
- *
- * @Author: doom
- * @Date: 2026/02/16/21:33
- * @Description:
- * 实现 DeepSeek/OpenAI 兼容适配器
- */
 @Component
-public class OpenAiCompatibleEngine implements AiEngine{
+public class OpenAiCompatibleEngine implements AiEngine {
     private final OkHttpClient client = new OkHttpClient.Builder()
             .connectTimeout(60, TimeUnit.SECONDS)
             .readTimeout(60, TimeUnit.SECONDS)
             .build();
 
     @Override
-    public String chat(String apiKey, String baseUrl, String model, String systemPrompt, List<AiServiceImpl.AiMessage> history, String userPrompt) {
+    public AiResponse chat(String apiKey, String baseUrl, String model, String systemPrompt,
+                           List<AiServiceImpl.AiMessage> history, String userPrompt) {
         JSONArray messages = new JSONArray();
-
-        // 1. 注入系统提示词 (维持厨师助手人设和锁定逻辑)
         messages.add(new JSONObject().fluentPut("role", "system").fluentPut("content", systemPrompt));
 
-        // 2. 注入历史记录 (如果是 getRecipe 初始生成，此处为 null)
         if (history != null && !history.isEmpty()) {
-            for (AiServiceImpl.AiMessage msg : history) {
-                messages.add(new JSONObject().fluentPut("role", msg.getRole()).fluentPut("content", msg.getContent()));
+            for (AiServiceImpl.AiMessage message : history) {
+                messages.add(new JSONObject()
+                        .fluentPut("role", message.getRole())
+                        .fluentPut("content", message.getContent()));
             }
         }
 
-        // 3. 注入当前请求
         messages.add(new JSONObject().fluentPut("role", "user").fluentPut("content", userPrompt));
 
         JSONObject body = new JSONObject()
                 .fluentPut("model", model)
                 .fluentPut("messages", messages);
 
-        // 处理 URL 路径拼接
-        String apiUrl = baseUrl;
-        if (!apiUrl.endsWith("/chat/completions")) {
-            apiUrl = apiUrl.endsWith("/") ? apiUrl + "chat/completions" : apiUrl + "/chat/completions";
-        }
+        String apiUrl = normalizeApiUrl(baseUrl);
 
         Request request = new Request.Builder()
                 .url(apiUrl)
                 .header("Authorization", "Bearer " + apiKey)
-                .post(RequestBody.create(MediaType.parse("application/json"), body.toJSONString()))
+                .post(RequestBody.create(body.toJSONString(), MediaType.parse("application/json")))
                 .build();
 
         try (Response response = client.newCall(request).execute()) {
-            if (!response.isSuccessful()) return "Error: API 返回错误码 " + response.code();
-            String resStr = response.body().string();
-            JSONObject resObj = JSON.parseObject(resStr);
-            return resObj.getJSONArray("choices").getJSONObject(0).getJSONObject("message").getString("content");
+            if (!response.isSuccessful()) {
+                return AiResponse.failure(classifyStatus(response.code()), "HTTP_" + response.code());
+            }
+
+            String responseBody = response.body() == null ? "" : response.body().string();
+            JSONObject responseJson = JSON.parseObject(responseBody);
+            JSONArray choices = responseJson.getJSONArray("choices");
+            if (choices == null || choices.isEmpty()) {
+                return AiResponse.failure(AiErrorType.AI_EMPTY_RESPONSE, "Missing choices");
+            }
+
+            JSONObject message = choices.getJSONObject(0).getJSONObject("message");
+            if (message == null) {
+                return AiResponse.failure(AiErrorType.AI_BAD_RESPONSE_FORMAT, "Missing message object");
+            }
+
+            String content = message.getString("content");
+            if (content == null || content.trim().isEmpty()) {
+                return AiResponse.failure(AiErrorType.AI_EMPTY_RESPONSE, "Empty content");
+            }
+
+            JSONObject usage = responseJson.getJSONObject("usage");
+            Integer promptTokens = usage == null ? null : usage.getInteger("prompt_tokens");
+            Integer completionTokens = usage == null ? null : usage.getInteger("completion_tokens");
+            Integer totalTokens = usage == null ? null : usage.getInteger("total_tokens");
+            return AiResponse.success(content, promptTokens, completionTokens, totalTokens);
+        } catch (SocketTimeoutException e) {
+            return AiResponse.failure(AiErrorType.AI_API_TIMEOUT, e.getMessage());
         } catch (Exception e) {
-            return "Error: " + e.getMessage();
+            return AiResponse.failure(AiErrorType.AI_UNKNOWN_ERROR, e.getMessage());
         }
+    }
+
+    private String normalizeApiUrl(String baseUrl) {
+        if (baseUrl.endsWith("/chat/completions")) {
+            return baseUrl;
+        }
+        return baseUrl.endsWith("/") ? baseUrl + "chat/completions" : baseUrl + "/chat/completions";
+    }
+
+    private AiErrorType classifyStatus(int statusCode) {
+        if (statusCode == 401 || statusCode == 403) {
+            return AiErrorType.AI_API_UNAUTHORIZED;
+        }
+        if (statusCode == 408 || statusCode == 504) {
+            return AiErrorType.AI_API_TIMEOUT;
+        }
+        return AiErrorType.AI_UNKNOWN_ERROR;
     }
 }

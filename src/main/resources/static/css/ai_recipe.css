@@ -1,60 +1,61 @@
-/* === 继承并增强全局样式 === */
+/* AI recipe page enhancements */
 
-/* 1. 食材列表区域优化 */
+.recipe-page-shell {
+  margin-top: 80px;
+  height: calc(100vh - 100px);
+}
+
 #foodList {
-  /* 配合 glass-card 的圆角 */
   border-radius: 0 0 12px 12px;
 }
 
 .list-group-item {
   transition: all 0.2s ease;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.3) !important; /* 极细的分隔线 */
+  border-bottom: 1px solid rgba(255, 255, 255, 0.3) !important;
 }
 
-/* 悬停时微微发光并右移，增加交互感 */
 .list-group-item:hover {
   background: rgba(255, 255, 255, 0.4) !important;
   transform: translateX(4px);
 }
 
-/* 选中状态（复选框选中时 JS 可添加此类，或者依赖默认样式） */
 .list-group-item input:checked + label {
   color: var(--primary-color);
   font-weight: 700 !important;
 }
 
-/* 2. 聊天记录区域优化 */
 #chatHistory {
-  /* 增加磨砂质感，提升文字在动态背景上的可读性 */
   background: rgba(255, 255, 255, 0.25);
   backdrop-filter: blur(8px);
   scroll-behavior: smooth;
   border-radius: 12px;
 }
 
-/* === Markdown 排版精修 (核心部分) === */
-/* AI 生成的食谱通常包含标题、列表和加粗文本，这里进行专门优化 */
+#chatHistory > .d-flex:last-child {
+  margin-bottom: 0 !important;
+}
 
-/* 气泡内的文本行高 */
 #chatHistory div.p-3 {
   line-height: 1.7;
   font-size: 0.95rem;
-  word-break: break-word; /* 防止长单词撑破布局 */
+  word-break: break-word;
 }
 
-/* 标题样式 (Markdown H1-H3) */
+#chatHistory h1,
+#chatHistory h2,
 #chatHistory h3,
 #chatHistory h4,
 #chatHistory h5 {
-  font-size: 1.15rem;
+  font-size: 1.1rem;
   font-weight: 700;
   margin-top: 12px;
   margin-bottom: 8px;
   padding-bottom: 4px;
-  border-bottom: 1px dashed rgba(0,0,0,0.1); /* 虚线分割，更有清单感 */
+  border-bottom: 1px dashed rgba(0, 0, 0, 0.1);
 }
 
-/* 用户气泡内的标题去除边框，颜色反白 */
+.bg-gradient-blue h1,
+.bg-gradient-blue h2,
 .bg-gradient-blue h3,
 .bg-gradient-blue h4,
 .bg-gradient-blue h5 {
@@ -62,7 +63,6 @@
   color: #fff !important;
 }
 
-/* 列表样式 (Markdown ul/ol) */
 #chatHistory ul,
 #chatHistory ol {
   padding-left: 1.4rem;
@@ -74,27 +74,77 @@
 }
 
 #chatHistory li::marker {
-  color: rgba(0, 0, 0, 0.5); /* 列表前的点颜色变浅 */
+  color: rgba(0, 0, 0, 0.5);
 }
+
 .bg-gradient-blue li::marker {
   color: rgba(255, 255, 255, 0.8);
 }
 
-/* 强调文本 (Markdown bold) */
 #chatHistory strong {
   color: #2d3436;
   font-weight: 700;
 }
+
 .bg-gradient-blue strong {
   color: #fff;
 }
 
-/* 去除最后一个元素的下边距，防止气泡底部留白过多 */
 #chatHistory *:last-child {
   margin-bottom: 0;
 }
 
-/* === 滚动条美化 (覆盖默认样式) === */
+.recipe-summary-card {
+  background: rgba(255, 255, 255, 0.78);
+  border: 1px solid rgba(13, 110, 253, 0.08);
+  border-radius: 16px;
+  padding: 1rem 1rem 0.9rem;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
+}
+
+.recipe-summary-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.recipe-summary-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #1f2937;
+}
+
+.recipe-summary-text {
+  margin-top: 0.35rem;
+  color: #4b5563;
+  font-size: 0.92rem;
+  line-height: 1.6;
+}
+
+.recipe-summary-icon {
+  color: #0d6efd;
+  font-size: 1.1rem;
+}
+
+.recipe-summary-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.85rem;
+}
+
+.recipe-chip {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0.35rem 0.75rem;
+  background: rgba(13, 110, 253, 0.08);
+  color: #0a58ca;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -105,32 +155,173 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(162, 155, 254, 0.4); /* 与主色调一致的淡紫色 */
+  background: rgba(162, 155, 254, 0.4);
   border-radius: 10px;
   transition: background 0.3s;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(108, 92, 231, 0.8); /* 深紫色 */
+  background: rgba(108, 92, 231, 0.8);
 }
 
-/* === 加载动画微调 === */
 .spinner-grow {
-  animation-duration: 1s; /* 加快一点闪烁速度 */
+  animation-duration: 1s;
 }
 
-/* === 输入框区域 === */
-#inputArea input:focus {
-  box-shadow: none; /* 去除 Bootstrap 默认的蓝色光晕，保持简洁 */
-  background-color: #f8f9fa;
+#quickActions {
+  background: rgba(255, 255, 255, 0.45);
 }
 
-/* === 动画效果补充 === */
+.quick-action-btn {
+  border: 1px solid rgba(13, 110, 253, 0.15);
+  background: rgba(255, 255, 255, 0.8);
+  color: #0d6efd;
+  border-radius: 999px;
+  padding: 0.45rem 0.85rem;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.quick-action-btn:hover {
+  background: rgba(13, 110, 253, 0.12);
+  color: #0a58ca;
+  transform: translateY(-1px);
+}
+
+.feedback-panel {
+  border-top: 1px dashed rgba(15, 23, 42, 0.12);
+  padding-top: 0.85rem;
+}
+
+.feedback-label {
+  font-size: 0.85rem;
+  color: #475569;
+  margin-bottom: 0.55rem;
+  font-weight: 600;
+}
+
+.feedback-btn {
+  border-radius: 999px;
+  padding: 0.4rem 0.8rem;
+  border: 1px solid transparent;
+  font-weight: 600;
+}
+
+.feedback-good {
+  background: rgba(22, 163, 74, 0.1);
+  color: #15803d;
+  border-color: rgba(22, 163, 74, 0.15);
+}
+
+.feedback-bad {
+  background: rgba(220, 38, 38, 0.08);
+  color: #b91c1c;
+  border-color: rgba(220, 38, 38, 0.12);
+}
+
+.feedback-hint {
+  min-height: 1.2rem;
+  font-size: 0.82rem;
+  color: #64748b;
+}
+
+.chat-compose-shell {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 52px;
+  gap: 0.75rem;
+  align-items: center;
+  padding: 0.65rem;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.06), 0 12px 24px rgba(15, 23, 42, 0.06);
+}
+
+.chat-compose-input {
+  width: 100%;
+  border: none;
+  outline: none;
+  background: transparent;
+  padding: 0 0.5rem 0 0.85rem;
+  font-size: 0.96rem;
+  color: #1f2937;
+}
+
+.chat-compose-input::placeholder {
+  color: #94a3b8;
+}
+
+.chat-send-btn {
+  width: 52px;
+  height: 52px;
+  border: none;
+  border-radius: 16px;
+  color: #fff;
+  background: linear-gradient(135deg, #0d6efd, #2563eb);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.15rem;
+  box-shadow: 0 12px 24px rgba(37, 99, 235, 0.26);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.chat-send-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 14px 28px rgba(37, 99, 235, 0.34);
+}
+
+.chat-send-btn:active {
+  transform: translateY(0);
+}
+
+.feedback-modal {
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 24px 48px rgba(15, 23, 42, 0.18);
+}
+
+.feedback-reason-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.feedback-reason-pill {
+  border: 1px solid rgba(220, 38, 38, 0.12);
+  background: rgba(248, 250, 252, 0.95);
+  color: #334155;
+  border-radius: 999px;
+  padding: 0.55rem 0.95rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.feedback-reason-pill:hover,
+.feedback-reason-pill.active {
+  background: rgba(220, 38, 38, 0.08);
+  color: #b91c1c;
+  border-color: rgba(220, 38, 38, 0.2);
+}
+
+.feedback-textarea {
+  border-radius: 16px;
+  border-color: rgba(148, 163, 184, 0.3);
+  resize: none;
+}
+
+.feedback-textarea:focus {
+  border-color: rgba(37, 99, 235, 0.45);
+  box-shadow: 0 0 0 0.2rem rgba(37, 99, 235, 0.12);
+}
+
 @keyframes slideInUp {
   from {
     opacity: 0;
     transform: translateY(10px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -139,4 +330,23 @@
 
 .animate-enter {
   animation: slideInUp 0.4s ease-out forwards;
+}
+
+@media (max-width: 767.98px) {
+  .recipe-page-shell {
+    height: auto;
+    min-height: calc(100vh - 100px);
+  }
+
+  .chat-compose-shell {
+    grid-template-columns: minmax(0, 1fr) 48px;
+    gap: 0.5rem;
+    padding: 0.55rem;
+  }
+
+  .chat-send-btn {
+    width: 48px;
+    height: 48px;
+    border-radius: 14px;
+  }
 }
